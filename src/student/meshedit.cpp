@@ -76,8 +76,103 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_face(Halfedge_Me
 */
 std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(Halfedge_Mesh::EdgeRef e) {
 
-    (void)e;
-    return std::nullopt;
+    //if border, do not flip
+    if (e->on_boundary()) {
+        return std::nullopt;
+    }
+
+    //NOTES: a vertex's halfedge must point back to the vertext
+
+    // STEP 1: Collecting the elements
+    // Halfedges:
+    HalfedgeRef h0 = e->halfedge();  //starting edge
+    HalfedgeRef h1 = h0->twin();     //and its twin
+
+    std::vector <HalfedgeRef> face0;
+    std::vector <HalfedgeRef> face1;
+
+    //load all halfedges inside a face into an vector
+    do {
+        face0.push_back(h0);   //push the halfedge into the array
+        h0 = h0->next();       // move to the next halfedge around the face
+    } while (h0 != e->halfedge());
+
+    do {
+        face1.push_back(h1);   //same thing for the twin/neighboring side
+        h1 = h1->next();       
+    } while (h1 != e->halfedge()->twin());
+
+    //reset h0 and h1 because I am an idiot
+    h0 = e->halfedge();  //starting edge
+    h1 = h0->twin();     //and its twin
+    
+    const size_t edgecount0 = face0.size();
+    const size_t edgecount1 = face1.size();
+
+    HalfedgeRef h2 = face0[1];                  //h0->next
+    HalfedgeRef h4 = face0[2];                  //used as the next value for flipped edge
+    HalfedgeRef h6 = face0[edgecount0 - 1];     //the edge previous to h0, need to modify next
+
+    HalfedgeRef h3 = face1[1];                  //h1->next
+    HalfedgeRef h5 = face1[2];                  //used as the next value for flipped edge
+    HalfedgeRef h7 = face1[edgecount1 - 1];     //the edge previous to h1, need to modify next
+
+    //Vetices:
+    //need to modify edge assocated with them
+    VertexRef v0 = h0->vertex();  //vertex corresponding to h0
+    VertexRef v1 = h1->vertex();  //vertex corresponding to h1
+
+    VertexRef v4 = h4->vertex(); //new startpoint for h1 
+    VertexRef v3 = h5->vertex(); //new startpoint for h0
+
+    //Faces:
+    //need to assocaite them with the modified edges
+    FaceRef f0 = h0->face();
+    FaceRef f1 = h1->face();
+
+    //STEP 2: modify the pointers on the halfedges
+    /** for every halfedge, modify:
+     * next, twin, vertex, edge, face 
+     */
+    h0->next() = h4;
+    h0->twin() = h1;
+    h0->vertex() = v3;
+    
+    h1->next() = h5;
+    h1->twin() = h0;
+    h0->vertex() = v4;
+    //edge and face unchanged
+
+    //STEP 3: reassign pointers at other points
+    //HALFEDGES:
+    //adjust the next positions of halfedges
+    h6->next() = h3;
+    h6->face() = f0;
+
+    h7->next() = h2;
+    h7->face() = f1;
+    //adjust halfedgees now belonging in a new face
+    //and next goes to the flipped edges
+    h2->next() = h1;
+    h2->face() = f1;
+    h2->vertex() = v0; //buggy
+
+    h3->next() = h0;
+    h3->face() = f0;
+    h3->vertex() = v1;
+
+    //VERTICES:
+    //associate vertices with new halfedges
+    v0->halfedge() = h3;
+    v1->halfedge() = h2;
+    v4->halfedge() = h1;
+    v3->halfedge() = h0;
+
+    //assocaite face with the flipped edges
+    f0->halfedge() = h0;
+    f1->halfedge() = h1;
+
+    return e;
 }
 
 /*
