@@ -91,31 +91,24 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(Halfedge_Mesh::Ed
     std::vector <HalfedgeRef> face0;
     std::vector <HalfedgeRef> face1;
 
-    //load all halfedges inside a face into an vector
-    do {
-        face0.push_back(h0);   //push the halfedge into the array
-        h0 = h0->next();       // move to the next halfedge around the face
-    } while (h0 != e->halfedge());
-
-    do {
-        face1.push_back(h1);   //same thing for the twin/neighboring side
-        h1 = h1->next();       
-    } while (h1 != e->halfedge()->twin());
-
-    //reset h0 and h1 because I am an idiot
-    h0 = e->halfedge();  //starting edge
-    h1 = h0->twin();     //and its twin
-    
     const size_t edgecount0 = face0.size();
     const size_t edgecount1 = face1.size();
 
-    HalfedgeRef h2 = face0[1];                  //h0->next
-    HalfedgeRef h4 = face0[2];                  //used as the next value for flipped edge
-    HalfedgeRef h6 = face0[edgecount0 - 1];     //the edge previous to h0, need to modify next
+    HalfedgeRef h2 = h0->next();                 //h0->next
+    HalfedgeRef h4 = h2->next();                 //used as the next value for flipped edge
+    HalfedgeRef h6 = h0;                         //the edge previous to h0, need to modify next
 
-    HalfedgeRef h3 = face1[1];                  //h1->next
-    HalfedgeRef h5 = face1[2];                  //used as the next value for flipped edge
-    HalfedgeRef h7 = face1[edgecount1 - 1];     //the edge previous to h1, need to modify next
+    while (h6->next() != h0) {
+        h6 = h6->next();
+    }
+
+    HalfedgeRef h3 = h1->next();                  //h1->next
+    HalfedgeRef h5 = h3->next();                  //used as the next value for flipped edge
+    HalfedgeRef h7 = h1;                          //the edge previous to h1, need to modify next
+
+    while(h7->next() != h1) {
+        h7 = h7->next();
+    }
 
     //Vetices:
     //need to modify edge assocated with them
@@ -137,10 +130,15 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(Halfedge_Mesh::Ed
     h0->next() = h4;
     h0->twin() = h1;
     h0->vertex() = v3;
+    h0->edge() = e;
+    h0->face() = f0;
     
     h1->next() = h5;
     h1->twin() = h0;
-    h0->vertex() = v4;
+    h1->vertex() = v4;
+    h1->edge() = e;
+    h1->face() = f1;
+
     //edge and face unchanged
 
     //STEP 3: reassign pointers at other points
@@ -155,11 +153,11 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(Halfedge_Mesh::Ed
     //and next goes to the flipped edges
     h2->next() = h1;
     h2->face() = f1;
-    h2->vertex() = v0; //buggy
+    h2->vertex() = v1; //buggy
 
     h3->next() = h0;
     h3->face() = f0;
-    h3->vertex() = v1;
+    h3->vertex() = v0;
 
     //VERTICES:
     //associate vertices with new halfedges
