@@ -125,6 +125,8 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
         EdgeRef e4 = h4->edge(); //ultimately collapse onto this edge
         EdgeRef e2 = h2->edge(); //edge that should get deleted
 
+        VertexRef v4 = h4->vertex();
+
         HalfedgeRef h23 = h2->twin()->next();
         HalfedgeRef h21 = h2->twin();
         while (h21->next() != h2->twin()) {
@@ -138,13 +140,16 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
          */
         h4->next() = h23;
         h4->face() = f2;
+        f2->halfedge() = h4;
 
         h21->next() = h4;
+        v4->halfedge() = h4;
 
         //STEP 3: erase points I don't want
         erase(h2->twin());
         erase(h2->edge());
         erase(h2);
+        erase(f0);
 
     } else {
         //not triangle, then simply redirect the points
@@ -157,6 +162,8 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
         //STEP 1: collect information
         EdgeRef e3 = h3->edge(); //ultimately collapse onto this edge
         EdgeRef e7 = h7->edge(); //edge that should get deleted
+
+        VertexRef v3 = h3->vertex();
 
         HalfedgeRef h13 = h7->twin()->next();
         HalfedgeRef h11 = h7->twin();
@@ -171,13 +178,16 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
          */
         h3->next() = h13;
         h3->face() = f3;
+        f3->halfedge() = h3;
 
         h11->next() = h3;
+        v3->halfedge() = h3;
 
         //STEP 3: erase points I don't want
         erase(h7->twin());
         erase(h7);
         erase(e7);
+        erase(f1);
 
     } else {
         //not triangle, then simply redirect the points
@@ -196,6 +206,8 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
     v0->pos = new_pos;
 
     //STEP 3: delete elements
+    erase(h0);
+    erase(h1);
     erase(v1);
     erase(e);
 
