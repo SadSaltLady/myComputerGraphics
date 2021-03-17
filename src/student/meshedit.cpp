@@ -56,8 +56,150 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
 */
 std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Mesh::EdgeRef e) {
 
-    (void)e;
-    return std::nullopt;
+    //note: in this implementation, we are collapsing onto v0
+
+        //DOESN'T HANDLE BOUNDARIES FOR NOW
+    if (e->on_boundary()) {
+        return std::nullopt;
+    }
+
+    //STEP 1: Collect all elements
+    //Halfedges corresponding to edge
+    HalfedgeRef h0 = e->halfedge();
+    HalfedgeRef h1 = h0->twin();
+
+    //halfedges used in face transform
+    HalfedgeRef h2 = h0->next();  //target next value for h4
+    HalfedgeRef h4 = h0;          //half edge previous to h0
+    while(h4->next() != h0) {
+        h4 = h4->next();
+    } 
+
+    HalfedgeRef h3 = h1->next();  //next for h7
+    HalfedgeRef h7 = h1;
+    while (h7->next() != h1) {    //half edge previous to h1
+        h7 = h7->next();
+    }
+
+    //endpoints/vertices on the edge
+    VertexRef v0 = h0->vertex();
+    VertexRef v1 = h1->vertex();
+
+    //collect all halfegdes going out from the endpoints
+    std::vector <HalfedgeRef> v0_edges;
+    std::vector <HalfedgeRef> v1_edges;
+
+    //iterate over half edges with twin()->next()
+    HalfedgeRef temp = h0;
+    while (temp->twin()->next() != h0) {
+        v0_edges.push_back(temp);
+        temp = temp->twin()->next();
+    }
+    temp = h1;
+    while (temp->twin()->next() != h1) {
+        v1_edges.push_back(temp);
+        temp = temp->twin()->next();
+    }
+
+    //collect faces corresponding to the edge into a vector
+    FaceRef f0 = h0->face();
+    FaceRef f1 = h1->face();
+
+    //STEP 2: reassign elements
+    //for all halfegdes on v1, change their vertex to v0
+    //HALFEDGES
+    /** for every halfedge, modify:
+     * next, twin, vertex, edge, face 
+     */
+    for (int i = 0; i < v1_edges.size(); i++) {
+        v1_edges.at(i)->vertex() = v0;
+    }
+
+        //now collapse the faces attached to the edge
+
+    //case on condition if the sides is boundary, and if the side is triangle
+    //for F0*****F0----------------------------------------------------------
+    if (f0->degree() <= 3) {
+        //if triangle, collapse into edge 
+        //STEP 1: collect information
+        EdgeRef e4 = h4->edge(); //ultimately collapse onto this edge
+        EdgeRef e2 = h2->edge(); //edge that should get deleted
+
+        HalfedgeRef h23 = h2->twin()->next();
+        HalfedgeRef h21 = h2->twin();
+        while (h21->next() != h2->twin()) {
+            h21 = h21->next();
+        }
+
+        FaceRef f2 = h2->twin()->face();
+        //STEP2 reassignment
+        /** for every halfedge, modify:
+         * next, twin, vertex, edge, face 
+         */
+        h4->next() = h23;
+        h4->face() = f2;
+
+        h21->next() = h4;
+
+        //STEP 3: erase points I don't want
+        erase(h2->twin());
+        erase(h2->edge());
+        erase(h2);
+
+    } else {
+        //not triangle, then simply redirect the points
+        h4->next() = h2;
+    }
+
+    //FOR F1------------------------------------------------------
+    if (f1->degree() <= 3) {
+        //if triangle, collapse into edge 
+        //STEP 1: collect information
+        EdgeRef e3 = h3->edge(); //ultimately collapse onto this edge
+        EdgeRef e7 = h7->edge(); //edge that should get deleted
+
+        HalfedgeRef h13 = h7->twin()->next();
+        HalfedgeRef h11 = h7->twin();
+        while (h11->next() != h7->twin()) {
+            h11 = h11->next();
+        }
+
+        FaceRef f3 = h7->twin()->face();
+        //STEP2 reassignment
+        /** for every halfedge, modify:
+         * next, twin, vertex, edge, face 
+         */
+        h3->next() = h13;
+        h3->face() = f3;
+
+        h11->next() = h3;
+
+        //STEP 3: erase points I don't want
+        erase(h7->twin());
+        erase(h7);
+        erase(e7);
+
+    } else {
+        //not triangle, then simply redirect the points
+        h4->next() = h2;
+    }
+
+    //VERTEX
+    //reassign v0->halfedge to ensure != h0
+    v0->halfedge() = h4->twin();
+
+    //change location of new vertex
+    Vec3 v0_pos = v0->center();
+    Vec3 v1_pos = v1->center();
+    Vec3 new_pos = (v0_pos + v1_pos)/2;
+
+    v0->pos = new_pos;
+
+    //STEP 3: delete elements
+    erase(v1);
+    erase(e);
+
+    return v0;
 }
 
 /*
@@ -153,7 +295,7 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(Halfedge_Mesh::Ed
     //and next goes to the flipped edges
     h2->next() = h1;
     h2->face() = f1;
-    h2->vertex() = v1; //buggy
+    h2->vertex() = v1; 
 
     h3->next() = h0;
     h3->face() = f0;
