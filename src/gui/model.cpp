@@ -13,7 +13,7 @@
 namespace Gui {
 
 Model::Model()
-    : spheres(Util::sphere_mesh(0.05f, 1)), cylinders(Util::cyl_mesh(0.05f, 1.0f)),
+    : spheres(Util::sphere_mesh(0.05f, 1)), cylinders(Util::cyl_mesh_disjoint(0.05f, 1.0f)),
       arrows(Util::arrow_mesh(0.05f, 0.1f, 1.0f)) {
 }
 
@@ -253,7 +253,7 @@ void Model::edge_viz(Halfedge_Mesh::EdgeRef e, Mat4& transform) {
     float v0s = vert_sizes[v_0->id()], v1s = vert_sizes[v_1->id()];
     float s = 0.5f * std::min(v0s, v1s);
 
-    if(dir.y == 1.0f || dir.y == -1.0f) {
+    if(1.0f - std::abs(dir.y) < EPS_F) {
         l *= sign(dir.y);
         transform = Mat4{Vec4{s, 0.0f, 0.0f, 0.0f}, Vec4{0.0f, l, 0.0f, 0.0f},
                          Vec4{0.0f, 0.0f, s, 0.0f}, Vec4{v0, 1.0f}};
@@ -404,38 +404,27 @@ void Model::rebuild() {
 bool Model::begin_bevel(std::string& err) {
 
     auto sel = selected_element();
-    if(sel.has_value()) {
-        if(std::holds_alternative<Halfedge_Mesh::HalfedgeRef>(*sel)) {
-            return false;
-        }
-    }
+    if(!sel.has_value()) return false;
 
     my_mesh->copy_to(old_mesh);
 
-    Halfedge_Mesh::FaceRef new_face;
-    std::visit(overloaded{[&](Halfedge_Mesh::VertexRef vert) {
-                              auto res = my_mesh->bevel_vertex(vert);
-                              if(res.has_value()) {
-                                  new_face = *res;
-                                  beveling = Bevel::vert;
-                              }
+    auto new_face = std::visit(overloaded{[&](Halfedge_Mesh::VertexRef vert) {
+                              beveling = Bevel::vert;
+                              return my_mesh->bevel_vertex(vert);
                           },
                           [&](Halfedge_Mesh::EdgeRef edge) {
-                              auto res = my_mesh->bevel_edge(edge);
-                              if(res.has_value()) {
-                                  new_face = *res;
-                                  beveling = Bevel::edge;
-                              }
+                              beveling = Bevel::edge;
+                              return my_mesh->bevel_edge(edge);
                           },
                           [&](Halfedge_Mesh::FaceRef face) {
-                              auto res = my_mesh->bevel_face(face);
-                              if(res.has_value()) {
-                                  new_face = *res;
-                                  beveling = Bevel::face;
-                              }
+                              beveling = Bevel::face;
+                              return my_mesh->bevel_face(face);
                           },
-                          [&](auto) {}},
+                          [&](auto) -> std::optional<Halfedge_Mesh::FaceRef> { return std::nullopt; }},
                *sel);
+
+    if(!new_face.has_value()) return false;
+    Halfedge_Mesh::FaceRef face = new_face.value();
 
     err = validate();
     if(!err.empty()) {
@@ -446,15 +435,15 @@ bool Model::begin_bevel(std::string& err) {
     } else {
 
         my_mesh->render_dirty_flag = true;
-        set_selected(new_face);
+        set_selected(face);
 
         trans_begin = {};
-        auto h = new_face->halfedge();
-        trans_begin.center = new_face->center();
+        auto h = face->halfedge();
+        trans_begin.center = face->center();
         do {
             trans_begin.verts.push_back(h->vertex()->pos);
             h = h->next();
-        } while(h != new_face->halfedge());
+        } while(h != face->halfedge());
 
         return true;
     }
