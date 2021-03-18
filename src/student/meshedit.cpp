@@ -47,8 +47,80 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_vertex(Halfedge_Mesh:
  */
 std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::EdgeRef e) {
 
-    (void)e;
-    return std::nullopt;
+    // DOESN'T HANDLE BOUNDARIES FOR NOW
+    if(e->on_boundary()) {
+        return std::nullopt;
+    }
+
+    // approach: collapse everything onto the f0 plane
+
+    // STEP 1: collect elements
+    // HALFEDGES
+    HalfedgeRef h0, h1, h2, h4, h3, h5;
+    h0 = e->halfedge();
+    h1 = h0->twin();
+
+    h2 = h0->next();
+    h4 = h0;
+    while(h4->next() != h0) {
+        h4 = h4->next();
+    }
+
+    h3 = h1->next();
+    h5 = h1;
+    while(h5->next() != h1) {
+        h5 = h5->next();
+    }
+
+    std::vector<HalfedgeRef> f1_edges;
+    HalfedgeRef temp = h1;
+    while(temp->next() != h1) {
+        temp = temp->next();
+        f1_edges.push_back(temp);
+    }
+    // Edges
+    EdgeRef e0 = h0->edge();
+    // VERTEX
+    VertexRef v0, v1;
+    v0 = h0->vertex();
+    v1 = h1->vertex();
+    // FACE
+    FaceRef f0 = h0->face();
+    FaceRef f1 = h1->face();
+
+    // STEP 2: Reassign elements
+    // HALFEDGES
+    // for every halfedge in f1 needs to be on f0
+    for(long unsigned int i = 0; i < f1_edges.size(); i++) {
+        f1_edges.at(i)->face() = f0;
+    }
+
+    h2->face() = f0;
+    h4->face() = f0;
+    h5->next() = h2;
+    h4->next() = h3;
+    // uncessary but it makes me happy
+    h2->vertex() = v1;
+    h3->vertex() = v0;
+
+    // VERTEX
+    v0->halfedge() = h3;
+    v1->halfedge() = h2;
+
+    // FACES
+    f0->halfedge() = h2;
+    // DEBUG
+    for(long unsigned int i = 0; i < f1_edges.size(); i++) {
+        assert(f1_edges.at(i)->face() == f0);
+    }
+
+    // STEP 3: Delete elements we don't want
+    erase(f1);
+    erase(h0);
+    erase(h1);
+    erase(e0);
+
+    return f0;
 }
 
 /*
@@ -369,37 +441,37 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(Halfedge_Mesh:
             return std::nullopt;
         }
         // STEP 1: Collect all elements (with respect to h0)
-        //HALFEDGES
+        // HALFEDGES
         HalfedgeRef h2, h4, h11, h13;
         h2 = h0->next();
         h4 = h2->next();
-        //on the boundary plane
+        // on the boundary plane
         h13 = h1->next();
         h11 = h1;
-        while (h11->next() != h1) {
+        while(h11->next() != h1) {
             h11 = h11->next();
         }
 
-        //EDGES
+        // EDGES
         EdgeRef e0 = h0->edge();
 
-        //VERTEX
+        // VERTEX
         VertexRef v0, v1, v2;
         v0 = h0->vertex();
         v1 = h1->vertex();
         v2 = h4->vertex();
 
-        //FACES
-        FaceRef f0 = h0->face();  //the actual face
-        FaceRef f = h1->face();   //the boundary plane
+        // FACES
+        FaceRef f0 = h0->face(); // the actual face
+        FaceRef f = h1->face();  // the boundary plane
 
-        //STEP 2: Create new elements
+        // STEP 2: Create new elements
         HalfedgeRef n0, n1, n2, n3;
         n0 = new_halfedge();
         n1 = new_halfedge();
         n2 = new_halfedge();
         n3 = new_halfedge();
-        
+
         EdgeRef e1, e2;
         e1 = new_edge();
         e2 = new_edge();
@@ -408,8 +480,8 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(Halfedge_Mesh:
 
         FaceRef f1 = new_face();
 
-        //STEP 3: reassignment
-        //HALFEDGES:
+        // STEP 3: reassignment
+        // HALFEDGES:
         /** for every halfedge, modify:
          * next, twin, vertex, edge, face
          */
@@ -437,7 +509,7 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(Halfedge_Mesh:
         n3->edge() = e2;
         n3->face() = f;
 
-        //OLD edges
+        // OLD edges
         h0->next() = n0;
         h0->edge() = e0;
         h0->face() = f0;
@@ -456,13 +528,13 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(Halfedge_Mesh:
         h11->next() = n3;
         h13->vertex() = v0;
 
-        //EDGES
+        // EDGES
         e1->halfedge() = n0;
         e2->halfedge() = n2;
         e0->halfedge() = h0;
 
-        //VERTEX
-        v2->halfedge() = n1;        
+        // VERTEX
+        v2->halfedge() = n1;
         v0->halfedge() = h0;
         v1->halfedge() = n3;
 
@@ -471,7 +543,7 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::split_edge(Halfedge_Mesh:
         pos_v3 = (v0->center() + v1->center()) / 2;
         v3->pos = pos_v3;
 
-        //FACE
+        // FACE
         f0->halfedge() = h4;
         f1->halfedge() = h2;
 
@@ -691,8 +763,151 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::bevel_face(Halfedge_Mesh::F
     // Reminder: You should set the positions of new vertices (v->pos) to be exactly
     // the same as wherever they "started from."
 
-    (void)f;
-    return std::nullopt;
+    // let's try
+    // Step 1: collect elements
+    // FACE
+    FaceRef f0 = f;
+
+    // HALF EDGES:
+    // collect all the inner & outer halfedges on the face
+    // all vertices, and all edges
+    std::vector<HalfedgeRef> inner_HE;
+    std::vector<HalfedgeRef> outer_HE;
+    std::vector<EdgeRef> outer_edge;
+    std::vector<VertexRef> outer_vertex;
+    unsigned int N = f->degree();
+
+    HalfedgeRef h0 = f0->halfedge();
+    HalfedgeRef h1 = h0->twin();
+
+    HalfedgeRef temp = h0;
+    while(temp->next() != h0) {
+        inner_HE.push_back(temp);
+        outer_HE.push_back(temp->twin());
+
+        EdgeRef e = temp->edge();
+        outer_edge.push_back(e);
+
+        VertexRef v = temp->vertex();
+        outer_vertex.push_back(v);
+
+        temp = temp->next();
+    }
+
+    // STEP 2: allocate new elements
+    /** for each edge, there needs to be:
+     * 1 new face
+     * 1 new (inner vertex)
+     * 2 edges
+     * and 4 half edges created
+     */
+
+    std::vector<FaceRef> new_surroundface;
+    std::vector<VertexRef> new_vertices;
+    std::vector<EdgeRef> new_twin_edge;
+    std::vector<EdgeRef> new_diagonal_edge;
+    std::vector<std::vector<HalfedgeRef>> new_HE;
+
+    for(long unsigned int i = 0; i < f0->degree(); i++) {
+        FaceRef newface = new_face();
+        new_surroundface.push_back(newface);
+
+        VertexRef newver = new_vertex();
+        // set vertex position
+        newver->pos = outer_vertex[i]->center();
+        new_vertices.push_back(newver);
+
+        EdgeRef newtwin = new_edge();
+        new_twin_edge.push_back(newtwin);
+
+        EdgeRef newdiagonal = new_edge();
+        new_diagonal_edge.push_back(newdiagonal);
+
+        std::vector<HalfedgeRef> HE_per_face;
+        // each new extruded face is 4 sided
+        for(long unsigned int j = 0; j < 4; j++) {
+            HalfedgeRef h = new_halfedge();
+            HE_per_face.push_back(h);
+        }
+        new_HE.push_back(HE_per_face);
+    }
+
+    // STEP 3: Reassign elements
+    // start by initializing all new elements per new allocated face
+    assert(new_HE.size() == N);
+    for(long unsigned int i = 0; i < N; i++) {
+        // iterate over the new faces
+        // collecte all elements in the face and then reassign
+        // halfedge array
+        std::vector<HalfedgeRef> per_face = new_HE[i];
+        // on the ouside/twin
+        std::vector<HalfedgeRef> pf_twin;
+        HalfedgeRef h4, h5, h6, h7;
+        h4 = inner_HE[i];
+        h5 = new_HE[(i + 1) % N][1];
+        h6 = outer_HE[i];
+        h7 = new_HE[(i + N - 1) % N][3];
+        pf_twin = {h4, h7, h6, h5};
+        // vertex
+        std::vector<VertexRef> face_vertex;
+        VertexRef v0, v1, v2, v3;
+        v0 = new_vertices[(i + 1) % N];
+        v1 = new_vertices[i];
+        v2 = outer_vertex[i];
+        v3 = outer_vertex[(i + 1) % N];
+        face_vertex = {v0, v1, v2, v3};
+        // edges
+        std::vector<EdgeRef> face_edge;
+        EdgeRef e0, e1, e2, e3;
+        e0 = new_twin_edge[i];
+        e1 = new_diagonal_edge[i];
+        e2 = outer_edge[i];
+        e3 = new_diagonal_edge[(i + 1) % N];
+        face_edge = {e0, e1, e2, e3};
+        // face
+        FaceRef ff = new_surroundface[i];
+
+        // INITIALIZE ALL NEW HALFEDGE
+        // HALFEDGES:
+        /** for every halfedge, modify:
+         * next, twin, vertex, edge, face
+         */
+        // INITIALIZE ALL NEW HALFEDGE
+        for(long unsigned int j = 0; j < 4; j++) {
+            per_face.at(j)->next() = per_face[(j + 1) % 4];
+            per_face.at(j)->twin() = pf_twin[j];
+            per_face.at(j)->vertex() = face_vertex[j];
+            per_face.at(j)->edge() = face_edge[j];
+            per_face.at(j)->face() = ff;
+        }
+        // redirect old halfedges
+        h4->twin() = per_face[0];
+        h4->vertex() = v1;
+        h4->edge() = e0;
+        h4->face() = f0;
+
+        h6->twin() = per_face[2];
+        h6->vertex() = v3;
+        h6->edge() = e2;
+
+        // VERTEX
+        v0->halfedge() = h5;
+        v1->halfedge() = h4;
+        v2->halfedge() = h7;
+        v3->halfedge() = h6;
+
+        // EDGES
+        e0->halfedge() = h4;
+        e1->halfedge() = h7;
+        e2->halfedge() = h6;
+        e3->halfedge() = h5;
+
+        // face
+        ff->halfedge() = per_face[0];
+    }
+
+    return f;
+    ;
 }
 
 /*
