@@ -2,6 +2,7 @@
 #include <queue>
 #include <set>
 #include <unordered_map>
+#include <cassert>
 
 #include "../geometry/halfedge.h"
 #include "debug.h"
@@ -88,6 +89,9 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
     //collect all halfegdes going out from the endpoints
     std::vector <HalfedgeRef> v0_edges;
     std::vector <HalfedgeRef> v1_edges;
+    //collect faces corresponding to the edge into a vector
+    FaceRef f0 = h0->face();
+    FaceRef f1 = h1->face();
 
     //iterate over half edges with twin()->next()
     HalfedgeRef temp = h0;
@@ -101,9 +105,7 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
         temp = temp->twin()->next();
     }
 
-    //collect faces corresponding to the edge into a vector
-    FaceRef f0 = h0->face();
-    FaceRef f1 = h1->face();
+
 
     //STEP 2: reassign elements
     //for all halfegdes on v1, change their vertex to v0
@@ -111,21 +113,26 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
     /** for every halfedge, modify:
      * next, twin, vertex, edge, face 
      */
-    for (int i = 0; i < v1_edges.size(); i++) {
+    for (long unsigned int i = 0; i < v1_edges.size(); i++) {
         v1_edges.at(i)->vertex() = v0;
     }
 
         //now collapse the faces attached to the edge
 
     //case on condition if the sides is boundary, and if the side is triangle
+
+    VertexRef v4 = h4->vertex();
+    VertexRef v3 = h7->vertex();
+
+    FaceRef f2 = h2->twin()->face();
+    FaceRef f3 = h7->twin()->face();
+
     //for F0*****F0----------------------------------------------------------
     if (f0->degree() <= 3) {
         //if triangle, collapse into edge 
         //STEP 1: collect information
-        EdgeRef e4 = h4->edge(); //ultimately collapse onto this edge
+        //EdgeRef e4 = h4->edge(); //ultimately collapse onto this edge
         EdgeRef e2 = h2->edge(); //edge that should get deleted
-
-        VertexRef v4 = h4->vertex();
 
         HalfedgeRef h23 = h2->twin()->next();
         HalfedgeRef h21 = h2->twin();
@@ -133,13 +140,13 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
             h21 = h21->next();
         }
 
-        FaceRef f2 = h2->twin()->face();
         //STEP2 reassignment
         /** for every halfedge, modify:
          * next, twin, vertex, edge, face 
          */
         h4->next() = h23;
         h4->face() = f2;
+        h4->vertex() = v4;
         f2->halfedge() = h4;
 
         h21->next() = h4;
@@ -147,23 +154,23 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
 
         //STEP 3: erase points I don't want
         erase(h2->twin());
-        erase(h2->edge());
         erase(h2);
+        erase(e2);
         erase(f0);
 
     } else {
         //not triangle, then simply redirect the points
         h4->next() = h2;
+        v4->halfedge() = h4;
     }
 
     //FOR F1------------------------------------------------------
     if (f1->degree() <= 3) {
         //if triangle, collapse into edge 
         //STEP 1: collect information
-        EdgeRef e3 = h3->edge(); //ultimately collapse onto this edge
+        //EdgeRef e3 = h3->edge(); //ultimately collapse onto this edge
         EdgeRef e7 = h7->edge(); //edge that should get deleted
 
-        VertexRef v3 = h3->vertex();
 
         HalfedgeRef h13 = h7->twin()->next();
         HalfedgeRef h11 = h7->twin();
@@ -171,17 +178,17 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
             h11 = h11->next();
         }
 
-        FaceRef f3 = h7->twin()->face();
         //STEP2 reassignment
         /** for every halfedge, modify:
          * next, twin, vertex, edge, face 
          */
         h3->next() = h13;
         h3->face() = f3;
+        //h3->vertex() = v0;
         f3->halfedge() = h3;
+        v3->halfedge() = h13;
 
         h11->next() = h3;
-        v3->halfedge() = h3;
 
         //STEP 3: erase points I don't want
         erase(h7->twin());
@@ -191,9 +198,10 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
 
     } else {
         //not triangle, then simply redirect the points
-        h4->next() = h2;
+        h3->next() = h7;
+        v3->halfedge() = h7;
     }
-
+    
     //VERTEX
     //reassign v0->halfedge to ensure != h0
     v0->halfedge() = h4->twin();
@@ -244,9 +252,6 @@ std::optional<Halfedge_Mesh::EdgeRef> Halfedge_Mesh::flip_edge(Halfedge_Mesh::Ed
 
     std::vector <HalfedgeRef> face0;
     std::vector <HalfedgeRef> face1;
-
-    const size_t edgecount0 = face0.size();
-    const size_t edgecount1 = face1.size();
 
     HalfedgeRef h2 = h0->next();                 //h0->next
     HalfedgeRef h4 = h2->next();                 //used as the next value for flipped edge
