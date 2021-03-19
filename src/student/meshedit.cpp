@@ -50,6 +50,34 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
     // DOESN'T HANDLE BOUNDARIES FOR NOW
     if(e->on_boundary()) {
         return std::nullopt;
+        //delete the edge, along with the face attached to it and all
+        /*
+        HalfedgeRef h0, h1, henter, hexit, h_prev;
+        if(!e->halfedge()->is_boundary()) {
+            h0 = e->halfedge();
+        } else {
+            assert(!e->halfedge()->twin()->is_boundary());
+            h0 = e->halfedge()->twin();
+        }
+
+        h1 = h0->twin(); //on boundary 
+
+        FaceRef f0 = h0->face();
+        FaceRef f = h1->face();
+
+
+
+        //COLLECT ELEMENTS:
+        std::vector<HalfedgeRef> inner_HE;
+        inner_HE.push_back(h0);
+        h_prev = h0;
+
+        for (unsigned int i; i < f0->degree()-1; i++) {
+            h0 = h0->next();
+            inner_HE.push_back(h0);
+        }
+        */
+
     }
 
     // approach: collapse everything onto the f0 plane
@@ -247,7 +275,9 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
     } else {
         // not triangle, then simply redirect the points
         h4->next() = h2;
+        h2->vertex() = v0;
         v4->halfedge() = h4;
+        f0->halfedge() = h0->next();
     }
 
     // FOR F1------------------------------------------------------
@@ -283,8 +313,11 @@ std::optional<Halfedge_Mesh::VertexRef> Halfedge_Mesh::collapse_edge(Halfedge_Me
 
     } else {
         // not triangle, then simply redirect the points
-        h3->next() = h7;
+        h7->next() = h3;
+        h7->twin()->vertex() = v0;
+        h3->vertex() = v0;
         v3->halfedge() = h7;
+        f1->halfedge() = h7;
     }
 
     // VERTEX
@@ -777,11 +810,11 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::bevel_face(Halfedge_Mesh::F
     std::vector<VertexRef> outer_vertex;
     unsigned int N = f->degree();
 
-    HalfedgeRef h0 = f0->halfedge();
-    HalfedgeRef h1 = h0->twin();
+    HalfedgeRef h0 = f->halfedge();
+    //HalfedgeRef h1 = h0->twin();
 
     HalfedgeRef temp = h0;
-    while(temp->next() != h0) {
+    for (unsigned int i = 0; i < N; i++) {
         inner_HE.push_back(temp);
         outer_HE.push_back(temp->twin());
 
@@ -807,22 +840,18 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::bevel_face(Halfedge_Mesh::F
     std::vector<EdgeRef> new_twin_edge;
     std::vector<EdgeRef> new_diagonal_edge;
     std::vector<std::vector<HalfedgeRef>> new_HE;
-
-    for(long unsigned int i = 0; i < f0->degree(); i++) {
+    assert(outer_vertex.size() == f->degree());
+    for(long unsigned int i = 0; i < outer_vertex.size(); i++) {
         FaceRef newface = new_face();
         new_surroundface.push_back(newface);
-
         VertexRef newver = new_vertex();
         // set vertex position
         newver->pos = outer_vertex[i]->center();
         new_vertices.push_back(newver);
-
         EdgeRef newtwin = new_edge();
         new_twin_edge.push_back(newtwin);
-
         EdgeRef newdiagonal = new_edge();
         new_diagonal_edge.push_back(newdiagonal);
-
         std::vector<HalfedgeRef> HE_per_face;
         // each new extruded face is 4 sided
         for(long unsigned int j = 0; j < 4; j++) {
@@ -922,7 +951,6 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::bevel_face(Halfedge_Mesh::F
 */
 void Halfedge_Mesh::bevel_vertex_positions(const std::vector<Vec3>& start_positions,
                                            Halfedge_Mesh::FaceRef face, float tangent_offset) {
-
     std::vector<HalfedgeRef> new_halfedges;
     auto h = face->halfedge();
     do {
@@ -1004,12 +1032,65 @@ void Halfedge_Mesh::bevel_face_positions(const std::vector<Vec3>& start_position
         new_halfedges.push_back(h);
         h = h->next();
     } while(h != face->halfedge());
+    
+    unsigned int N = (unsigned int)new_halfedges.size();
 
-    (void)new_halfedges;
-    (void)start_positions;
-    (void)face;
-    (void)tangent_offset;
-    (void)normal_offset;
+    //Updating tangent & normal vectors
+    /*
+    std::vector<Vec3> HE_tangents; 
+    std::vector<Vec3> HE_normals;
+    std::vector<VertexRef> verts;
+    */
+    /** store all the tangent vectors:
+     * tangent calculated by a projection of v's location onto the midpoint of segment v2-v0
+     * and projected onto the normal plane, such that its not modifying the normal
+     * I think this is how Maya does it?
+     */
+
+    /** store all the normal vectors :
+     * normal vectors are done by calculating the cross product of v1 and v0, such that
+     * in the case of n-gon faces it will still generate a reasonable result 
+     */
+
+    assert(new_halfedges.size() == face->degree());
+
+    for(size_t i = 0; i < new_halfedges.size(); i++) {
+        //store the vertex 
+        VertexRef v = new_halfedges[i]->vertex();
+
+        //store all the tangent vectors
+        Vec3 v0_pos = start_positions[(i+N-1) % N];
+        Vec3 v1_pos = start_positions[i];
+        Vec3 v2_pos = start_positions[(i+1) % N];
+        Vec3 tangent = (v0_pos + v2_pos)/2 - v1_pos;
+        tangent.normalize();
+
+        //store all normals
+        Vec3 dir0 = v0_pos - v1_pos;
+        Vec3 dir1 = v2_pos - v1_pos;
+        Vec3 normal = cross(dir0, dir1);
+        normal.normalize();
+
+        //coplaner tests        
+        /*
+        Vec3 v3_pos = start_positions[(i+N-2) % N];
+        Vec3 v4_pos = start_positions[(i+2) % N];
+        Vec3 dir00 = v4_pos - v1_pos;
+        Vec3 dir00 = v3_pos - v1_pos;
+        */
+
+
+
+
+        //projection of tangent onto normal
+        Vec3 projection_v = dot(tangent, normal) * normal;
+        tangent = tangent - projection_v;
+        //tangent.normalize();
+
+        //update the vertex positions
+        
+        v->pos = v1_pos + tangent * tangent_offset + normal * normal_offset;
+    }
 }
 
 /*
