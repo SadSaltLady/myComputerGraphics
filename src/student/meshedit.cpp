@@ -50,7 +50,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
     // DOESN'T HANDLE BOUNDARIES FOR NOW
     if(e->on_boundary()) {
         return std::nullopt;
-        //delete the edge, along with the face attached to it and all
+        // delete the edge, along with the face attached to it and all
         /*
         HalfedgeRef h0, h1, henter, hexit, h_prev;
         if(!e->halfedge()->is_boundary()) {
@@ -60,7 +60,7 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
             h0 = e->halfedge()->twin();
         }
 
-        h1 = h0->twin(); //on boundary 
+        h1 = h0->twin(); //on boundary
 
         FaceRef f0 = h0->face();
         FaceRef f = h1->face();
@@ -77,7 +77,6 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
             inner_HE.push_back(h0);
         }
         */
-
     }
 
     // approach: collapse everything onto the f0 plane
@@ -811,10 +810,10 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::bevel_face(Halfedge_Mesh::F
     unsigned int N = f->degree();
 
     HalfedgeRef h0 = f->halfedge();
-    //HalfedgeRef h1 = h0->twin();
+    // HalfedgeRef h1 = h0->twin();
 
     HalfedgeRef temp = h0;
-    for (unsigned int i = 0; i < N; i++) {
+    for(unsigned int i = 0; i < N; i++) {
         inner_HE.push_back(temp);
         outer_HE.push_back(temp->twin());
 
@@ -1032,12 +1031,12 @@ void Halfedge_Mesh::bevel_face_positions(const std::vector<Vec3>& start_position
         new_halfedges.push_back(h);
         h = h->next();
     } while(h != face->halfedge());
-    
+
     unsigned int N = (unsigned int)new_halfedges.size();
 
-    //Updating tangent & normal vectors
+    // Updating tangent & normal vectors
     /*
-    std::vector<Vec3> HE_tangents; 
+    std::vector<Vec3> HE_tangents;
     std::vector<Vec3> HE_normals;
     std::vector<VertexRef> verts;
     */
@@ -1049,29 +1048,30 @@ void Halfedge_Mesh::bevel_face_positions(const std::vector<Vec3>& start_position
 
     /** store all the normal vectors :
      * normal vectors are done by calculating the cross product of v1 and v0, such that
-     * in the case of n-gon faces it will still generate a reasonable result 
+     * in the case of n-gon faces it will still generate a reasonable result
      */
 
     assert(new_halfedges.size() == face->degree());
 
     for(size_t i = 0; i < new_halfedges.size(); i++) {
-        //store the vertex 
+        // store the vertex
         VertexRef v = new_halfedges[i]->vertex();
 
-        //store all the tangent vectors
-        Vec3 v0_pos = start_positions[(i+N-1) % N];
+        // store all the tangent vectors
+        Vec3 v0_pos = start_positions[(i + N - 1) % N];
         Vec3 v1_pos = start_positions[i];
-        Vec3 v2_pos = start_positions[(i+1) % N];
-        Vec3 tangent = (v0_pos + v2_pos)/2 - v1_pos;
+        Vec3 v2_pos = start_positions[(i + 1) % N];
+        Vec3 tangent = (v0_pos + v2_pos) / 2 - v1_pos;
         tangent.normalize();
 
-        //store all normals
+        // store all normals
         Vec3 dir0 = v0_pos - v1_pos;
         Vec3 dir1 = v2_pos - v1_pos;
         Vec3 normal = cross(dir0, dir1);
-        normal.normalize();
+        normal.normalize(); 
+        //Vec3 normal = (face->normal()).normalize();
 
-        //coplaner tests        
+        // coplaner tests
         /*
         Vec3 v3_pos = start_positions[(i+N-2) % N];
         Vec3 v4_pos = start_positions[(i+2) % N];
@@ -1079,16 +1079,13 @@ void Halfedge_Mesh::bevel_face_positions(const std::vector<Vec3>& start_position
         Vec3 dir00 = v3_pos - v1_pos;
         */
 
-
-
-
-        //projection of tangent onto normal
+        // projection of tangent onto normal
         Vec3 projection_v = dot(tangent, normal) * normal;
         tangent = tangent - projection_v;
-        //tangent.normalize();
+        // tangent.normalize();
 
-        //update the vertex positions
-        
+        // update the vertex positions
+
         v->pos = v1_pos + tangent * tangent_offset + normal * normal_offset;
     }
 }
@@ -1099,6 +1096,101 @@ void Halfedge_Mesh::bevel_face_positions(const std::vector<Vec3>& start_position
 void Halfedge_Mesh::triangulate() {
 
     // For each face...
+    printf("i ran\n");
+    //size_t face_count = n_faces();
+    for(FaceRef f = faces_begin(); f != faces_end(); f++) {
+        printf("traversing...\n");
+        if((!f->is_boundary()) && f->degree() > 3) {
+            unsigned int count = f->degree() - 3;
+            printf("degree is %ud, id is %ud, count is %ud\n", f->degree(), f->id(), count);
+            FaceRef f_old = f;
+            HalfedgeRef A = f->halfedge();
+            HalfedgeRef B = A->next()->next();
+            HalfedgeRef A_prev, B_prev, temp;
+            std::vector<HalfedgeRef> AtoB; //halfedged between A to B by calling next
+            std::vector<HalfedgeRef> BtoA; //BtoA inclusive of B, exclusive of A
+            VertexRef vA, vB;
+            FaceRef f_AB, f_BA;
+            for(unsigned int i = 0; i < count; ++i) {
+                // collect elements 
+                printf("iterated at %ud\n", i);
+                temp = A;
+                while(temp != B){
+                    AtoB.push_back(temp);
+                    temp = temp->next();
+                }
+                assert(temp == B);
+                while(temp != A) {
+                    BtoA.push_back(temp);
+                    temp = temp->next();
+                }
+
+                B_prev = AtoB.back();
+                A_prev = BtoA.back();
+
+                vA = A->vertex();
+                vB = B->vertex();
+                // allocate new elements
+                FaceRef f_new = new_face();
+                EdgeRef e = new_edge();
+                HalfedgeRef AB = new_halfedge();
+                HalfedgeRef BA = new_halfedge();
+                // reassign elements
+                // HALFEDGES:
+                /** for every halfedge, modify:
+                 * next, twin, vertex, edge, face */
+                AB->next() = B;
+                AB->twin() = BA;
+                AB->vertex() = vA;
+                AB->edge() = e;
+
+                BA->next() = A;
+                BA->twin() = AB;
+                BA->vertex() = vB;
+                BA->edge() = e;
+
+                A_prev->next() = AB;
+                B_prev->next() = BA;
+                //EDGES
+                e->halfedge() = AB;
+                //VERTICES
+                vA->halfedge() = AB;
+                vB->halfedge() = BA;
+                //faces
+                if (i%2 == 0) { // for all even i
+                    f_AB = f_old;
+                    f_BA = f_new;
+                } else {
+                    f_AB = f_new;
+                    f_BA = f_old;
+                }
+
+                for (std::vector<HalfedgeRef>::iterator it = AtoB.begin() ; it != AtoB.end(); ++it) {
+                    (*it)->face() = f_BA;
+                }
+                BA->face() = f_BA;
+                f_BA->halfedge() = BA;
+                for (std::vector<HalfedgeRef>::iterator it = BtoA.begin() ; it != BtoA.end(); ++it) {
+                    (*it)->face() = f_AB;
+                }
+                AB->face() = f_AB;
+                f_AB->halfedge() = AB;
+                if (i%2 == 0) { // for all even i
+                    assert(f_BA->degree() == 3);
+                    f_old = f_AB;
+                    A = B->next();
+                    B = AB;
+                } else {
+                    assert(f_AB->degree() == 3);
+                    f_old = f_BA;
+                    B = A->next();
+                    A = BA;
+                }
+                AtoB.clear();
+                BtoA.clear();
+            }
+        }
+    }
 }
 
 /* Note on the quad subdivision process:
@@ -1161,13 +1253,22 @@ void Halfedge_Mesh::linear_subdivide_positions() {
 
     // For each vertex, assign Vertex::new_pos to
     // its original position, Vertex::pos.
+    for(VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+        v->new_pos = v->pos;
+    }
 
     // For each edge, assign the midpoint of the two original
     // positions to Edge::new_pos.
+    for(EdgeRef e = edges_begin(); e != edges_end(); e++){
+        e->new_pos = e->center();
+    }
 
     // For each face, assign the centroid (i.e., arithmetic mean)
     // of the original vertex positions to Face::new_pos. Note
     // that in general, NOT all faces will be triangles!
+    for (FaceRef f = faces_begin(); f != faces_end(); f++) {
+        f->new_pos = f->center();
+    }
 }
 
 /*
@@ -1189,10 +1290,43 @@ void Halfedge_Mesh::catmullclark_subdivide_positions() {
     // rules. (These rules are outlined in the Developer Manual.)
 
     // Faces
+    for (FaceRef f = faces_begin(); f != faces_end(); f++) {
+        f->new_pos = f->center();
+    }
 
     // Edges
+    for(EdgeRef e = edges_begin(); e != edges_end(); e++){
+        //collect the neighboring faces & halfedges
+        HalfedgeRef A = e->halfedge();
+        HalfedgeRef B = A->twin();
+        FaceRef faceA = A->face();
+        FaceRef faceB = B->face();
+        //face average + edge center/2
+        e->new_pos = (faceA->new_pos + faceB->new_pos + e->center()*2.0f)/4.0f;
+    }
 
     // Vertices
+    for(VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+        float n = (float)v->degree();
+        //iterate over all faces & edges connected to a vertex
+        HalfedgeRef h = v->halfedge();
+        HalfedgeRef h_start = v->halfedge();
+        Vec3 Q = Vec3();
+        Vec3 R = Vec3();
+        Vec3 S = v->pos;
+        do {
+            FaceRef f = h->face();
+            EdgeRef e = h->edge();
+            Q += f->new_pos;
+            R += e->center();
+            h = h->twin()->next();
+        } while (h != h_start);
+
+        Q = Q/n;
+        R = R/n;
+        
+        v->new_pos = (Q + 2.0f*R + (n-3.0f)*S)/n;
+    }
 }
 
 /*

@@ -1,0 +1,48 @@
+AndrewID: yunyizha
+
+EdgeCollapse:
+
+    implemented but doesn't collapse boundary edges
+    crashes when there's overlapping faces on the same vertex
+    I tried to handle it gracefully but it seems my code isn't doing it :(
+    
+    Some documentation (also in code comments):
+    access the vertex corresponding to h0, name it checking 2
+    what I wanted to do is to loop over all halfedges coming out of an vertex(checking2) (by calling next->twin), 
+    and find the other vertex(checking2) in which the halfedge(or rather edge) resides between. 
+    
+    If ay other halfedges have the same other vertex(checking3) as the halfedges I began with (h0)
+    then that would suggest there's two edges overlapping, which is not good and my program should stop.
+
+    But it's not stopping...I don't know why
+
+    
+
+EdgeFlip:
+
+    Fully implemented.
+    
+
+EdgeSplit:
+
+    Fully implemented.
+
+FaceBevel:
+
+    Fully implemented. However results are jank on non-planar faces
+
+    Some documentation (also in code comments):
+    * tangent calculated by a projection of v's location onto the midpoint of segment v2-v0
+    * and projected onto the normal plane, such that its not modifying the normal
+
+    * normal vectors are done by calculating the cross product of v1 and v0
+
+    I noticed that in case of a vertices on the "border" when the plane folds, if you reverse the
+    the tangent and the normal(in the way I'm calculating it) you can get extrude effects like how 
+    maya does it, but I wasn't able to figure out how to detect the vertices
+
+
+
+Any other comments and considerations:
+
+    I also implemented eraseedge that doesn't handle on border cases, can this get extra credit?
