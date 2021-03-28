@@ -50,33 +50,6 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
     // DOESN'T HANDLE BOUNDARIES FOR NOW
     if(e->on_boundary()) {
         return std::nullopt;
-        // delete the edge, along with the face attached to it and all
-        /*
-        HalfedgeRef h0, h1, henter, hexit, h_prev;
-        if(!e->halfedge()->is_boundary()) {
-            h0 = e->halfedge();
-        } else {
-            assert(!e->halfedge()->twin()->is_boundary());
-            h0 = e->halfedge()->twin();
-        }
-
-        h1 = h0->twin(); //on boundary
-
-        FaceRef f0 = h0->face();
-        FaceRef f = h1->face();
-
-
-
-        //COLLECT ELEMENTS:
-        std::vector<HalfedgeRef> inner_HE;
-        inner_HE.push_back(h0);
-        h_prev = h0;
-
-        for (unsigned int i; i < f0->degree()-1; i++) {
-            h0 = h0->next();
-            inner_HE.push_back(h0);
-        }
-        */
     }
 
     // approach: collapse everything onto the f0 plane
@@ -111,6 +84,11 @@ std::optional<Halfedge_Mesh::FaceRef> Halfedge_Mesh::erase_edge(Halfedge_Mesh::E
     VertexRef v0, v1;
     v0 = h0->vertex();
     v1 = h1->vertex();
+
+    if (v0->degree() == 1 || v1->degree() == 1) {
+        //edge case
+        return std::nullopt;
+    }
     // FACE
     FaceRef f0 = h0->face();
     FaceRef f1 = h1->face();
@@ -1099,10 +1077,10 @@ void Halfedge_Mesh::triangulate() {
     printf("i ran\n");
     //size_t face_count = n_faces();
     for(FaceRef f = faces_begin(); f != faces_end(); f++) {
-        printf("traversing...\n");
+        //printf("traversing...\n");
         if((!f->is_boundary()) && f->degree() > 3) {
             unsigned int count = f->degree() - 3;
-            printf("degree is %ud, id is %ud, count is %ud\n", f->degree(), f->id(), count);
+            //printf("degree is %ud, id is %ud, count is %ud\n", f->degree(), f->id(), count);
             FaceRef f_old = f;
             HalfedgeRef A = f->halfedge();
             HalfedgeRef B = A->next()->next();
@@ -1113,7 +1091,7 @@ void Halfedge_Mesh::triangulate() {
             FaceRef f_AB, f_BA;
             for(unsigned int i = 0; i < count; ++i) {
                 // collect elements 
-                printf("iterated at %ud\n", i);
+                //printf("iterated at %ud\n", i);
                 temp = A;
                 while(temp != B){
                     AtoB.push_back(temp);
@@ -1498,14 +1476,45 @@ struct Edge_Record {
     Edge_Record(std::unordered_map<Halfedge_Mesh::VertexRef, Mat4>& vertex_quadrics,
                 Halfedge_Mesh::EdgeRef e)
         : edge(e) {
-
+            //edge = e;
         // Compute the combined quadric from the edge endpoints.
+        Halfedge_Mesh::VertexRef v0 = e->halfedge()->vertex();
+        Halfedge_Mesh::VertexRef v1 = e->halfedge()->twin()->vertex();
+        Mat4 K_edge = vertex_quadrics[v0] + vertex_quadrics[v1];
         // -> Build the 3x3 linear system whose solution minimizes the quadric error
         //    associated with these two endpoints.
-        // -> Use this system to solve for the optimal position, and store it in
-        //    Edge_Record::optimal.
-        // -> Also store the cost associated with collapsing this edge in
-        //    Edge_Record::cost.
+        Mat4 A = K_edge;
+        A.cols[3].x = 0.0f; A.cols[3].y = 0.0f; A.cols[3].z = 0.0f; A.cols[3].w = 1.0f;
+        A.cols[0].w = 0.0f; A.cols[1].w = 0.0f; A.cols[2].w = 0.0f;
+        Vec3 b = Vec3(-A.cols[3].x, -A.cols[3].y, -A.cols[3].z);
+
+        //if inverse exists: 
+        if (A.det() != 0) {
+            // -> Use this system to solve for the optimal position, and store it in
+            //    Edge_Record::optimal.
+            Vec3 x = A.inverse() * b;
+            optimal = x;
+            // -> Also store the cost associated with collapsing this edge in
+            //    Edge_Record::cost.
+            Vec4 x_calc = Vec4(x, 1.0f);
+            Vec4 why = (K_edge * x_calc);
+            cost = dot(x_calc, why);
+        } else {
+            //pick one of the end points with the lower cost. 
+            Vec4 v0_pos = Vec4(v0->pos, 1.0f);
+            Vec4 v1_pos = Vec4(v1->pos, 1.0f); 
+
+            float cost_v0 = dot(v0_pos, (K_edge*v0_pos));
+            float cost_v1 = dot(v1_pos, (K_edge*v1_pos));
+
+            if (cost_v0 < cost_v1) {
+                cost = cost_v0;
+                optimal = v0->pos;
+            } else {
+                cost = cost_v1;
+                optimal = v1->pos;
+            }
+        }
     }
     Halfedge_Mesh::EdgeRef edge;
     Vec3 optimal;
@@ -1611,14 +1620,57 @@ bool Halfedge_Mesh::simplify() {
     std::unordered_map<EdgeRef, Edge_Record> edge_records;
     PQueue<Edge_Record> edge_queue;
 
+    //remember current face count of mesh and calculate for target
+    size_t original = n_faces();
+    size_t target = original/4;
+
     // Compute initial quadrics for each face by simply writing the plane equation
     // for the face in homogeneous coordinates. These quadrics should be stored
     // in face_quadrics
+
+    for (FaceRef f = faces_begin(); f != faces_end(); f++) {
+        //pick a vertex
+        VertexRef p = f->halfedge()->vertex();
+        //compute normalized normal and offset
+        Vec3 n = f->normal().normalize();
+        float d = -dot(p->pos, n);
+        //compose v 
+        Vec4 v = Vec4(n.x, n.y, n.z, d);
+        //calculate matrix K
+        Mat4 K = outer(v, v);
+        face_quadrics[f] = K;
+    }
+    printf("loaded face quadrics \n");
     // -> Compute an initial quadric for each vertex as the sum of the quadrics
     //    associated with the incident faces, storing it in vertex_quadrics
+    for (VertexRef v = vertices_begin(); v != vertices_end(); v++) {
+        //halfedge to iterate over faces
+        HalfedgeRef h = v->halfedge();
+        unsigned int count = v->degree();
+        Mat4 K_sum = Mat4(Vec4(),Vec4(),Vec4(),Vec4());
+        FaceRef f;
+        //iterate over faces and collect sum
+        for (unsigned int i = 0; i < count; i++) {
+            f = h->face();
+            assert(face_quadrics.count(f) == 1);
+            Mat4 K = face_quadrics[f];
+            K_sum += K;
+            h = h->twin()->next();
+        }
+        //add to dictionary
+        vertex_quadrics[v] = K_sum;
+    }
+    printf("loaded vertex quadrics \n");
+
     // -> Build a priority queue of edges according to their quadric error cost,
     //    i.e., by building an Edge_Record for each edge and sticking it in the
     //    queue. You may want to use the above PQueue<Edge_Record> for this.
+    for (EdgeRef e = edges_begin(); e != edges_end(); e++) {
+        Edge_Record R = Edge_Record(vertex_quadrics, e);
+        edge_records[e] = R;
+        edge_queue.insert(R);
+    }
+    printf("loaded edge and PQ  \n");
     // -> Until we reach the target edge budget, collapse the best edge. Remember
     //    to remove from the queue any edge that touches the collapsing edge
     //    BEFORE it gets collapsed, and add back into the queue any edge touching
@@ -1626,12 +1678,87 @@ bool Halfedge_Mesh::simplify() {
     //    a quadric to the collapsed vertex, and to pop the collapsed edge off the
     //    top of the queue.
 
+    for (size_t i = 0; i < original-target; i++) {
+        Edge_Record cheapest = edge_queue.top();
+        edge_queue.pop();
+        printf("checkpoint4\n");
+        //get the removed edge and its endpoints
+        EdgeRef removed = cheapest.edge;
+        VertexRef v0 = removed->halfedge()->vertex();
+        VertexRef v1 = removed->halfedge()->twin()->vertex();
+        Mat4 m_v0 = vertex_quadrics[v0];
+        Mat4 m_v1 = vertex_quadrics[v1];
+        printf("checkpoint5\n");
+        //Remove any edge touching either of its endpoints from the queue.
+        unsigned int v0_d = v0->degree();
+        unsigned int v1_d = v1->degree();
+        HalfedgeRef ref = v0->halfedge();
+        printf("checkpoint6\n");
+        for (unsigned int j = 0; j < v0_d; j++) {
+            EdgeRef eref = ref->edge();
+            auto search = edge_records.find(eref);
+            if (search != edge_records.end()) {
+                printf("checkpoint11\n");
+                Edge_Record e_rec = edge_records[eref];
+                //found an edge assocaited with endpoint v0;
+                edge_queue.remove(e_rec);
+            }
+            ref = ref->twin()->next();
+        }
+        ref = v1->halfedge();
+        printf("checkpoint7\n");
+        for (unsigned int j = 0; j < v1_d; j++) {
+            printf("checkpoint8\n");
+            EdgeRef eref = ref->edge();
+            printf("waht");
+            auto search = edge_records.find(eref);
+            printf("checkpoint9\n");
+            if (search != edge_records.end()) {
+                printf("checkpoint11\n");
+                Edge_Record e_rec = edge_records[eref];
+                //found an edge assocaited with endpoint v1;
+                edge_queue.remove(e_rec);
+                printf("checkpoint10\n");
+            }
+            ref = ref->twin()->next();
+        }
+        
+        printf("removed all elem from PQ \n");
+
+
+        //collapse the edge
+        auto v = collapse_edge_erase(removed);
+        if (v.has_value()){
+            VertexRef v_new = v.value();
+            printf("checkpoint1\n");
+            //set location of new vertex
+            //Set the quadric of the new vertex to the quadric computed in Step 3.
+            vertex_quadrics[v_new] = m_v0 + m_v1;
+            printf("checkpoint2\n");
+            unsigned int n = v_new->degree();
+            HalfedgeRef he_new = v_new->halfedge();
+            EdgeRef e_new;
+            printf("checkpoint3\n");
+            for (unsigned int jj = 0; jj < n; jj++) {
+                e_new = he_new->edge();
+                Edge_Record R = Edge_Record(vertex_quadrics, e_new);
+                //insert into dictionary
+                edge_records[e_new] = R;
+                //insert into Pqueue
+                edge_queue.insert(R);
+                he_new = he_new->twin()->next();
+            }
+        }
+        printf("added new elems\n");
+
+    }
+
+
     // Note: if you erase elements in a local operation, they will not be actually deleted
     // until do_erase or validate are called. This is to facilitate checking
     // for dangling references to elements that will be erased.
     // The rest of the codebase will automatically call validate() after each op,
     // but here simply calling collapse_edge() will not erase the elements.
     // You should use collapse_edge_erase() instead for the desired behavior.
-
-    return false;
+    return true;
 }

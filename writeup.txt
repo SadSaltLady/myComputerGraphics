@@ -41,8 +41,18 @@ FaceBevel:
     the tangent and the normal(in the way I'm calculating it) you can get extrude effects like how 
     maya does it, but I wasn't able to figure out how to detect the vertices
 
+Triangulation, LinearSubdivision, and CatmullClarkSubdivision:
+    fully implemented
 
+LoopSubdivision:
+    fully implemented
+
+3D model:
+    I dedicate my model to Emma <3
 
 Any other comments and considerations:
 
     I also implemented eraseedge that doesn't handle on border cases, can this get extra credit?
+    I wrote all the code for simplfy cuz I thought it was cool, but didn't get it to run without errors. 
+    Can I get partial credit from this ;-; effort points? 
+    Perhaps on like correctly setting the edge_record and such. 
