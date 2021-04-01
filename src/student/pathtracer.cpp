@@ -21,7 +21,25 @@ Spectrum Pathtracer::trace_pixel(size_t x, size_t y) {
 
     // This currently generates a ray at the bottom left of the pixel every time.
 
-    Ray out = camera.generate_ray(xy / wh);
+    // NAIVE IMPLEMENTATION:
+    /** generate one ray at the center of the pixel, add a randomly generated offset,
+     * normalize to screenspace coordinates([0-1] ~[0-1]), and then pass it to generate ray
+     */
+
+    Samplers::Rect::Uniform get_sample;
+    get_sample.size = Vec2(1.0f, 1.0f);
+    float pdf;
+    Vec2 offset = get_sample.sample(pdf);
+
+    // Vec2 offset = Vec2(0.5f, 0.5f);
+    // normalized, then shift to [-0.5 - 0.5] coordinates
+    Vec2 cameraspace = (xy + offset) / wh - Vec2(0.5f, 0.5f);
+    assert(cameraspace.x >= -0.5f && cameraspace.x <= 0.5f);
+    assert(cameraspace.y >= -0.5f && cameraspace.y <= 0.5f);
+
+    Ray out = camera.generate_ray(cameraspace);
+
+    if(RNG::coin_flip(0.0005f)) log_ray(out, 5.0f);
     return trace_ray(out);
 }
 
