@@ -42,5 +42,5 @@ Ray Camera::generate_ray(Vec2 screen_coord) const {
     //find ray direction in world space
     Vec3 ray_world = ws_sample - ws_origin;
 
-    return Ray(ws_origin, ray_world.normalize());
+    return Ray(ws_origin, ray_world.unit());
 }

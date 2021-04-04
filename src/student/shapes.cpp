@@ -1,6 +1,8 @@
 
 #include "../rays/shapes.h"
 #include "debug.h"
+#include <iostream>
+#include "../util/rand.h"
 
 namespace PT {
 
@@ -23,14 +25,14 @@ Trace Sphere::hit(const Ray& ray) const {
     /** slide referenced: 
      * https://cmu-graphics.github.io/Scotty3D/pathtracer/ray_sphere_intersection
      */
-    float a = dot(ray.dir, ray.dir); //if dir is normalized, this is just 1?
+    //float a = 1; //if dir is normalized, this is just 1?
     float b = 2.0f * dot(ray.point, ray.dir);
     float c = dot(ray.point, ray.point) - radius*radius;
 
     //try to solve it 
-    bool pos, neg, single; //mark if we had found a solution
+    bool pos, neg; //mark if we had found a solution
     float pos_t, neg_t, dist_pos, dist_neg;
-    Vec3 pos_sol, neg_sol, first, next;
+    Vec3 pos_sol, neg_sol;
     Trace ret;
     ret.origin = ray.point;
     ret.hit = false;       // was there an intersection?
@@ -38,43 +40,70 @@ Trace Sphere::hit(const Ray& ray) const {
     ret.position = Vec3{}; // where was the intersection?
     ret.normal = Vec3{};   // what was the surface normal at the intersection?
 
-    pos, neg, single = false; 
-    //pos_sol, neg_sol = 15462;
-    //situation 1: no intersection -> no real solution
-    float inside = b*b - 4*a*c; //inside the sqrt
+    pos = false; neg = false;
+    //SITUATION 1: no intersection -> no real solution
+    float inside = b*b - 4*c; //inside the sqrt
     if (inside >= 0.0f) {
-        pos_t = b/2 + sqrt(inside);
-        neg_t = b/2 - sqrt(inside);
-        pos, neg = true;
-        if (inside == 0) {
-            single = true;
-        }
+        pos_t = (-b + sqrt(inside))/2.0f;
+        neg_t = (-b - sqrt(inside))/2.0f;
     } else {
-        return ret;
+        return ret; //if no real solution can be found, no intersection
     }
-    
+    //calculate for point of intersection
     pos_sol = ray.point + pos_t*ray.dir;
     neg_sol = ray.point + neg_t*ray.dir;
+    //calculate the distance of intersection
+    dist_pos = (pos_sol - ray.point).norm();
+    dist_neg = (neg_sol - ray.point).norm();
 
-    dist_pos = pos_sol.norm();
-    dist_neg = neg_sol.norm();
-
-    //determine which intersection came first
-    if (dist_pos < dist_neg) {
-        first = pos_sol;
-        next = neg_sol;
-    } else {
-        first = neg_sol;
-        next = pos_sol;
+    //check which intersection is in bound of ray.dist_disbound
+    if (dist_pos > ray.dist_bounds.x && dist_pos < ray.dist_bounds.y) {
+        pos = true;
+    }
+    if (dist_neg > ray.dist_bounds.x && dist_neg < ray.dist_bounds.y) {
+        neg = true;
     }
 
-    //if (first)
+    //SITUATION 2: has solutions, but none are inbound, no intersection is found
+    if (!pos && !neg) {
+        return ret;
+    }
 
-    // If the ray intersects the sphere twice, ret should
-    // represent the first intersection, but remember to respect
-    // ray.dist_bounds! For example, if there are two intersections,
-    // but only the _later_ one is within ray.dist_bounds, you should
-    // return that one!
+    ret.hit = true; //all situation onewards ensures a hit               
+    
+    //SITUATION 3: if one of them is in bound, then return the inbound solution
+    if (pos && !neg) { //positive intersects
+        ret.distance = dist_pos;   
+        ret.position = pos_sol; 
+        ret.normal = pos_sol.unit();  
+        //update the ray_dist bounds
+        ray.dist_bounds.y = dist_pos;
+        return ret;
+    } else if (neg && !pos) { //negative intersects
+        ret.distance = dist_neg;   
+        ret.position = neg_sol; 
+        ret.normal = neg_sol.unit();  
+        //update the ray_dist bounds
+        ray.dist_bounds.y = dist_neg;
+        return ret;
+    }
+
+    //situation 3: two intersections, record the closer one
+    //determine which intersection came first
+    if (dist_pos < dist_neg) {
+        ret.distance = dist_pos;   
+        ret.position = pos_sol; 
+        ret.normal = pos_sol.unit();  
+        //update the ray_dist bounds
+        ray.dist_bounds.y = dist_pos;
+    } else {
+        ret.distance = dist_neg;   
+        ret.position = neg_sol; 
+        ret.normal = neg_sol.unit();  
+        //update the ray_dist bounds
+        ray.dist_bounds.y = dist_neg;
+    }
+    if(RNG::coin_flip(0.0001f)) std::cout << ret.position;
 
     return ret;
 }
