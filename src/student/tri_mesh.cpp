@@ -12,11 +12,11 @@ BBox Triangle::bbox() const {
     Vec3 v_1 = vertex_list[v1].position;
     Vec3 v_2 = vertex_list[v2].position;
 
-    Vec3 min_bound = Vec3(std::min(std::min(v_0.x, v_1.x), v_2.x),
+    Vec3 min = Vec3(std::min(std::min(v_0.x, v_1.x), v_2.x),
                           std::min(std::min(v_0.y, v_1.y), v_2.y),
                           std::min(std::min(v_0.z, v_1.z), v_2.z));
 
-    Vec3 max_bound = Vec3(std::max(std::max(v_0.x, v_1.x), v_2.x),
+    Vec3 max = Vec3(std::max(std::max(v_0.x, v_1.x), v_2.x),
                           std::max(std::max(v_0.y, v_1.y), v_2.y),
                           std::max(std::max(v_0.z, v_1.z), v_2.z));
 
@@ -24,10 +24,14 @@ BBox Triangle::bbox() const {
     // Beware of flat/zero-volume boxes! You may need to
     // account for that here, or later on in BBox::intersect
 
-    //*****************NOT TAKEN CARE OF YET!!! @TOASK: WHAT TO DO?
-    //just have an eplison 
+    float epsilon = 0.0625f; //nice floating point :)
+    //in case of flat/zero-volume box, add a small epsilon to the axis
+    Vec3 diff = max - min;
+    if (diff.x == 0.0f) max.x += epsilon;
+    if (diff.y == 0.0f) max.y += epsilon;
+    if (diff.z == 0.0f) max.z += epsilon;
 
-    BBox box = BBox(min_bound, max_bound);
+    BBox box = BBox(min, max);
     return box;
 }
 

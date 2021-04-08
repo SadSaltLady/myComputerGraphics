@@ -25,7 +25,7 @@ Trace Sphere::hit(const Ray& ray) const {
     /** slide referenced: 
      * https://cmu-graphics.github.io/Scotty3D/pathtracer/ray_sphere_intersection
      */
-    //float a = 1; //if dir is normalized, this is just 1?
+    //float a = 1; //if dir is normalized, it's just 1
     float b = 2.0f * dot(ray.point, ray.dir);
     float c = dot(ray.point, ray.point) - radius*radius;
 
@@ -103,7 +103,7 @@ Trace Sphere::hit(const Ray& ray) const {
         //update the ray_dist bounds
         ray.dist_bounds.y = dist_neg;
     }
-    if(RNG::coin_flip(0.0001f)) std::cout << ret.position;
+    //if(RNG::coin_flip(0.0001f)) std::cout << ret.position;
 
     return ret;
 }

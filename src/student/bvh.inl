@@ -37,12 +37,126 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     // single leaf node (which is also the root) that encloses all the
     // primitives.
 
-    // Replace these
-    BBox box;
-    for(const Primitive& prim : primitives) box.enclose(prim.bbox());
+    printf("%zd", max_leaf_size);
+    size_t root = construct(primitives, 0, primitives.size(), max_leaf_size);
+    root_idx = root;
+}
 
-    new_node(box, 0, primitives.size(), 0, 0);
-    root_idx = 0;
+template<typename Primitive>
+size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, size_t size, size_t max_leaf_size) {
+    //BASE CASE: construct leaf node
+    if (size <= max_leaf_size) {
+        printf("leaf\n");
+        BBox leaf_box;
+        for(size_t prim_idx = start; prim_idx < start + size; prim_idx++) {
+            Primitive& prim = prims[prim_idx];
+            leaf_box.enclose(prim.bbox());
+        }
+        size_t idx = new_node(leaf_box, start, size, 0, 0);
+        return idx;
+    }
+    //RECURSIVE CASE
+    printf("recursed, start: %zd, size: %zd\n", start, size);
+    BBox box; //construct a bbox that encloses all the primatives
+    for(size_t prim_idx = start; prim_idx < start + size; prim_idx++) {
+        const Primitive& prim = prims[prim_idx];
+        box.enclose(prim.bbox());
+    } 
+    //gather information about its min and max
+    Vec3 bbmin = box.min;
+    Vec3 bbmax = box.max;
+
+    /** we want to keep track of the best partitions,
+     * each partition is defined by:
+     * - the partitioning axis
+     * - the partitioning idx (where did we slice)
+     * - the SAH cost
+     */
+    Vec3 best_axis = Vec3();
+    size_t best_idx = 0;
+    float best_SAH = INFINITY;
+    size_t best1 = 0;
+    size_t best2 = 0;
+    //initalize the evalution values
+    BBox eval_box1;
+    BBox eval_box2;
+    size_t prim_count1 = 0;
+    size_t prim_count2 = 0;
+    float amount;
+    float SAH;
+
+    float bucket_size = 8.0f;
+    float slice_size;
+    std::vector<Vec3> axes;
+    Vec3 axis; //contais x, y, z axis
+    axes.push_back(Vec3(1.0f, 0.0f, 0.0f));
+    axes.push_back(Vec3(0.0f, 1.0f, 0.0f));
+    axes.push_back(Vec3(0.0f, 0.0f, 1.0f));
+
+    //evaluate base on the 3 axis
+    for (size_t a = 0; a < 3; a++) {
+        axis = axes[a];
+        slice_size = (dot(bbmax, axis) - dot(bbmin, axis))/bucket_size;
+        assert (slice_size > 0); //DEBUG
+
+        //for each axis../
+        for (size_t i = 1; i < bucket_size; i++) {
+            amount = dot(bbmin, axis) + i*slice_size;
+            //form a partition
+            auto partition_pt = std::partition(
+                prims.begin() + start, prims.begin() + start + size, 
+                            [&](const Primitive& prim) -> bool {
+                                return(dot(prim.bbox().center(), axis) < amount);}
+            );
+            //construct bbox from partition 
+            for(auto prim = prims.begin()+start; prim != partition_pt; prim++) {
+                //Primitive& prim = prims[prim_idx];
+                eval_box1.enclose((*prim).bbox());
+                ++prim_count1;
+            }
+            for(auto prim = partition_pt; prim != prims.begin() + start + size; prim++) {
+                eval_box2.enclose((*prim).bbox());
+                ++prim_count2;
+            }
+            //evaluate SAH
+            SAH = (prim_count1*eval_box1.surface_area()) + (prim_count2*eval_box2.surface_area());
+
+            //if better partition than current partition, record the current partition
+            if (SAH < best_SAH) {
+                best_axis = axis;
+                best_idx = i;
+                best_SAH = SAH;
+                best1 = prim_count1;
+                best2 = prim_count2;
+            }
+
+            //clear boxes & values
+            eval_box1.reset();
+            eval_box2.reset();
+            prim_count1 = 0;
+            prim_count2 = 0;
+        }
+    }
+
+    //partition along the best partition 
+    assert(best_idx != 0);
+    slice_size = (dot(bbmax, best_axis) - dot(bbmin, best_axis))/bucket_size;
+    amount = dot(bbmin, best_axis) + best_idx*slice_size;
+    auto partition_pt = std::partition(prims.begin() + start, prims.begin() + start + size, 
+                            [&](const Primitive& prim) -> bool { 
+            return (dot(prim.bbox().center(), axis) < amount); }
+            );
+    size_t partitionIdx = size_t(std::distance(prims.begin(), partition_pt));
+    //size_t partitions_size = partitionIdx - start;
+
+    printf("partiton index: %zd, best: %zd, %zd, idx: %zd, size: %f",partitionIdx, best1, best2,best_idx, slice_size);
+    //make recursive calls
+    size_t left = construct(prims, start, best1, max_leaf_size);
+    size_t right = construct(prims, partitionIdx, best2, max_leaf_size);
+ 
+    //cosntruct node
+    size_t idx = new_node(box, start, size, left, right);
+    return idx;
 }
 
 template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {

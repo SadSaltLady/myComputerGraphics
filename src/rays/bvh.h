@@ -13,6 +13,8 @@ public:
     BVH() = default;
     BVH(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
     void build(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
+    size_t construct(std::vector<Primitive>& prims, size_t start, size_t size,
+                     size_t max_leaf_size);
 
     BVH(BVH&& src) = default;
     BVH& operator=(BVH&& src) = default;
