@@ -25,7 +25,7 @@ public:
 
     BBox bbox() const;
     Trace hit(const Ray& ray) const;
-    Trace find_closest_hit(const Ray& ray, size_t node_idx) const;
+    Trace find_closest_hit(const Ray& ray, size_t node_idx, Vec2& hitinfo) const;
 
 
     BVH copy() const;

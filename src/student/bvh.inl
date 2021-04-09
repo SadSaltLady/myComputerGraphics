@@ -13,7 +13,7 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     // us to build a BVH over any type that defines a certain interface. Specifically,
     // we use this to both build a BVH over triangles within each Tri_Mesh, and over
     // a variety of Objects (which might be Tri_Meshes, Spheres, etc.) in Pathtracer.
-    //
+    //s
     // The Primitive interface must implement these two functions:
     //      BBox bbox() const;
     //      Trace hit(const Ray& ray) const;
@@ -37,7 +37,6 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     // single leaf node (which is also the root) that encloses all the
     // primitives.
 
-    printf("%zd", max_leaf_size);
     size_t root = construct(primitives, 0, primitives.size(), max_leaf_size);
     root_idx = root;
 }
@@ -46,7 +45,6 @@ template<typename Primitive>
 size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, size_t size, size_t max_leaf_size) {
     //BASE CASE: construct leaf node
     if (size <= max_leaf_size) {
-        printf("leaf\n");
         BBox leaf_box;
         for(size_t prim_idx = start; prim_idx < start + size; prim_idx++) {
             Primitive& prim = prims[prim_idx];
@@ -56,7 +54,6 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
         return idx;
     }
     //RECURSIVE CASE
-    printf("recursed, start: %zd, size: %zd\n", start, size);
     BBox box; //construct a bbox that encloses all the primatives
     for(size_t prim_idx = start; prim_idx < start + size; prim_idx++) {
         const Primitive& prim = prims[prim_idx];
@@ -177,47 +174,83 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 
     // The starter code simply iterates through all the primitives.
     // Again, remember you can use hit() on any Primitive value.
+    Vec2 hitinfo = Vec2(0.0f, ray.dist_bounds.y);
+    Trace ret = find_closest_hit(ray, root_idx, hitinfo);
 
-    Trace ret;
-    for(const Primitive& prim : primitives) {
-        Trace hit = prim.hit(ray);
-        ret = Trace::min(ret, hit);
-    }
     return ret;
 }
 
 
 template<typename Primitive> 
-Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx) const {
+Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx, Vec2& hitinfo) const {
     Trace ret;
     ret.origin = ray.point;
     ret.hit = false;       
     ret.distance = INFINITY;   
     //base case where it's a leaf
-    if (is_leaf(node[node_idx])){
-        BVH<Primitive>::Node& thisnode = node[node_idx];
+    if (nodes[node_idx].is_leaf()){
+        const Node& thisnode = nodes[node_idx];
         for(size_t i = thisnode.start; i < thisnode.start + thisnode.size; i++) {
-            const Primitive& prim = primatives[i];
+            const Primitive& prim = primitives[i];
             Trace hit = prim.hit(ray);
             ret = Trace::min(ret, hit);
         }
+
+        hitinfo.y = ret.distance;
         return ret;
     }
     //for all that are not a leaf...
-    const Node& = nodes[node_idx];
-    BBox& box = nodes[node_idx].bbox;
+    const Node& node = nodes[node_idx];
+    const BBox& box = nodes[node_idx].bbox;
     Vec2 times;
     //if it doesn't hit the bounding box, return no hit & no need to recurse
-    if (!box.hit(ray,times)) {
+    if (!box.hit(ray,hitinfo)) {
         ret.hit = false;
         return ret;
     }
-    
-    //if it hits, evalutate base on the children
-    Trace left = find_closest_hit(ray, node.l);
-    Trace right = find_closest_hit(ray, node.r);
 
-    return Trace::min(left, right);
+    //just...work for now please
+    Trace left = find_closest_hit(ray, node.l, hitinfo);
+    Trace right = find_closest_hit(ray, node.r, hitinfo);
+
+    ret = Trace::min(left, right);
+    return ret;
+
+    /**
+    //update hitinfo
+    hitinfo = times;
+    //in order traversal, first test on the left and right subnodes
+    Vec2 left_times;
+    Vec2 right_times;
+    Vec2 first, second;
+    bool left_hit = nodes[node.l].bbox.hit(ray, left_times);
+    bool right_hit = nodes[node.r].bbox.hit(ray, right_times);
+    //find the closer one to our camera
+    const Node& first = nodes[node.l];
+    const Node& second = nodes[node.r];
+    first = left_hit;
+    second = right_hit;
+    if (right_times.x < left_times.x) {
+        first = nodes[node.r];
+        second = nodes[node.l];
+        first = right_hit;
+        second = left_hit;
+    }
+    //try to trace over the closer one first
+    Trace t_first = find_closest_hit(ray, first, hitinfo);
+    if (!t_first.hit) { //if no hit, return the next part
+        return find_closest_hit(ray, second, hitinfo);
+    }
+
+    //if it hits, hit point must be infront of the smaller of right
+    float distance_first = t_first.distance;
+    float distance_second = (second.x*ray.dir).norm();
+    if (distance_second <= distance_first) {
+        Trace right = find_closest_hit(ray, node.r);
+        return Trace::min(left, right);
+    }
+    return t_first;
+    */
 }
 
 
