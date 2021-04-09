@@ -15,6 +15,7 @@ public:
     void build(std::vector<Primitive>&& primitives, size_t max_leaf_size = 1);
     size_t construct(std::vector<Primitive>& prims, size_t start, size_t size,
                      size_t max_leaf_size);
+                     
 
     BVH(BVH&& src) = default;
     BVH& operator=(BVH&& src) = default;
@@ -24,6 +25,8 @@ public:
 
     BBox bbox() const;
     Trace hit(const Ray& ray) const;
+    Trace find_closest_hit(const Ray& ray, size_t node_idx) const;
+
 
     BVH copy() const;
     size_t visualize(GL::Lines& lines, GL::Lines& active, size_t level, const Mat4& trans) const;

@@ -13,6 +13,7 @@ bool BBox::hit(const Ray& ray, Vec2& times) const {
      * https://www.scratchapixel.com/lessons/3d-basic-rendering/minimal-ray-tracer-rendering-simple-shapes/ray-box-intersection
      */
 
+    //does the ray pass through the box
     Vec3 invdir = 1 / ray.dir;
     float tmin, tmax, tymin, tymax, tzmin, tzmax;
     tmin = (min.x - ray.point.x) * invdir.x;
@@ -51,5 +52,12 @@ bool BBox::hit(const Ray& ray, Vec2& times) const {
         times.y = tmax;
     }
 
-    return false;
+    //it intersects the box, but is the intersection in range of the ray?
+    Vec3 min_point = ray.point + tmin*ray.dir;
+    float min_dist = (min_point - ray.point).norm();
+    if (min_dist > ray.dist_bounds.y)    {
+        return false;
+    }
+    
+    return true;
 }

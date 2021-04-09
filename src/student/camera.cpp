@@ -17,8 +17,8 @@ Ray Camera::generate_ray(Vec2 screen_coord) const {
     float sw = aspect_ratio * sh;
 
     //view_space coordinate of sampled point
-    float vs_x = screen_coord.x * sw; 
-    float vs_y = screen_coord.y * sh; 
+    float vs_x = screen_coord.x * sw * focal_dist; 
+    float vs_y = screen_coord.y * sh * focal_dist; 
     float focal = -1.0f * focal_dist;
     Vec3 vs_sample = Vec3(vs_x, vs_y, focal);
 

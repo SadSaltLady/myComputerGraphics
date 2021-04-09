@@ -152,11 +152,10 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
             return (dot(prim.bbox().center(), best_axis) < amount); }
             );
     size_t partitionIdx = start + best1;
-    //size_t(std::distance(prims.begin(), partition_pt));
-    //size_t partitions_size = partitionIdx - start;
-    printf("current box has size: %zd, best index is %zd, best axis is: %zd \n", size, best_idx, axis_idx);
-    if (axis_idx == 2) printf("YOOOOOOOOOOOOO LOOK HERE\n");
-    printf("partiton index: %zd, best1: %zd, best2: %zd, start: %zd, size: %f",partitionIdx, best1, best2,start, slice_size);
+    //debug
+    //printf("current box has size: %zd, best index is %zd, best axis is: %zd \n", size, best_idx, axis_idx);
+    //printf("partiton index: %zd, best1: %zd, best2: %zd, start: %zd, size: %f",partitionIdx, best1, best2,start, slice_size);
+    
     //make recursive calls
     assert(best2 + best1 == size);
     assert(start + best1 == partitionIdx);
@@ -187,11 +186,15 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
     return ret;
 }
 
-/**
+
 template<typename Primitive> 
-Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx,  ) const {
+Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx) const {
+    Trace ret;
+    ret.origin = ray.point;
+    ret.hit = false;       
+    ret.distance = INFINITY;   
+    //base case where it's a leaf
     if (is_leaf(node[node_idx])){
-        Trace ret;
         BVH<Primitive>::Node& thisnode = node[node_idx];
         for(size_t i = thisnode.start; i < thisnode.start + thisnode.size; i++) {
             const Primitive& prim = primatives[i];
@@ -200,8 +203,23 @@ Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx,  ) const
         }
         return ret;
     }
+    //for all that are not a leaf...
+    const Node& = nodes[node_idx];
+    BBox& box = nodes[node_idx].bbox;
+    Vec2 times;
+    //if it doesn't hit the bounding box, return no hit & no need to recurse
+    if (!box.hit(ray,times)) {
+        ret.hit = false;
+        return ret;
+    }
+    
+    //if it hits, evalutate base on the children
+    Trace left = find_closest_hit(ray, node.l);
+    Trace right = find_closest_hit(ray, node.r);
+
+    return Trace::min(left, right);
 }
-*/
+
 
 template<typename Primitive>
 BVH<Primitive>::BVH(std::vector<Primitive>&& prims, size_t max_leaf_size) {
