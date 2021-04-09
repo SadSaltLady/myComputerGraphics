@@ -73,6 +73,7 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
      * - the SAH cost
      */
     Vec3 best_axis = Vec3();
+    size_t axis_idx = 4;
     size_t best_idx = 0;
     float best_SAH = INFINITY;
     size_t best1 = 0;
@@ -87,21 +88,23 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
 
     float bucket_size = 8.0f;
     float slice_size;
-    std::vector<Vec3> axes;
     Vec3 axis; //contais x, y, z axis
-    axes.push_back(Vec3(1.0f, 0.0f, 0.0f));
-    axes.push_back(Vec3(0.0f, 1.0f, 0.0f));
-    axes.push_back(Vec3(0.0f, 0.0f, 1.0f));
 
     //evaluate base on the 3 axis
-    for (size_t a = 0; a < 3; a++) {
-        axis = axes[a];
+    for (size_t a = 0; a < 3; ++a) {
+        if (a == 0) {
+            axis = Vec3(0.0f, 0.0f, 1.0f);
+        } else if (a == 1){
+            axis = Vec3(1.0f, 0.0f, 0.0f);
+        } else {
+            axis = Vec3(0.0f, 1.0f, 0.0f);
+        }
         slice_size = (dot(bbmax, axis) - dot(bbmin, axis))/bucket_size;
         assert (slice_size > 0); //DEBUG
-
+        float temp = dot(bbmin, axis);
         //for each axis../
         for (size_t i = 1; i < bucket_size; i++) {
-            amount = dot(bbmin, axis) + i*slice_size;
+            amount =  temp + i*slice_size;
             //form a partition
             auto partition_pt = std::partition(
                 prims.begin() + start, prims.begin() + start + size, 
@@ -119,15 +122,17 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
                 ++prim_count2;
             }
             //evaluate SAH
-            SAH = (prim_count1*eval_box1.surface_area()) + (prim_count2*eval_box2.surface_area());
+            SAH = (prim_count1*eval_box1.surface_area()/box.surface_area()) + 
+                (prim_count2*eval_box2.surface_area()/box.surface_area());
 
             //if better partition than current partition, record the current partition
-            if (SAH < best_SAH) {
+            if (prim_count1 > 0 && prim_count2 > 0 && SAH < best_SAH) {
                 best_axis = axis;
                 best_idx = i;
                 best_SAH = SAH;
                 best1 = prim_count1;
                 best2 = prim_count2;
+                axis_idx = a;
             }
 
             //clear boxes & values
@@ -144,13 +149,18 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
     amount = dot(bbmin, best_axis) + best_idx*slice_size;
     auto partition_pt = std::partition(prims.begin() + start, prims.begin() + start + size, 
                             [&](const Primitive& prim) -> bool { 
-            return (dot(prim.bbox().center(), axis) < amount); }
+            return (dot(prim.bbox().center(), best_axis) < amount); }
             );
-    size_t partitionIdx = size_t(std::distance(prims.begin(), partition_pt));
+    size_t partitionIdx = start + best1;
+    //size_t(std::distance(prims.begin(), partition_pt));
     //size_t partitions_size = partitionIdx - start;
-
-    printf("partiton index: %zd, best: %zd, %zd, idx: %zd, size: %f",partitionIdx, best1, best2,best_idx, slice_size);
+    printf("current box has size: %zd, best index is %zd, best axis is: %zd \n", size, best_idx, axis_idx);
+    if (axis_idx == 2) printf("YOOOOOOOOOOOOO LOOK HERE\n");
+    printf("partiton index: %zd, best1: %zd, best2: %zd, start: %zd, size: %f",partitionIdx, best1, best2,start, slice_size);
     //make recursive calls
+    assert(best2 + best1 == size);
+    assert(start + best1 == partitionIdx);
+    assert(partitionIdx + best2 <= prims.size());
     size_t left = construct(prims, start, best1, max_leaf_size);
     size_t right = construct(prims, partitionIdx, best2, max_leaf_size);
  
@@ -176,6 +186,22 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
     }
     return ret;
 }
+
+/**
+template<typename Primitive> 
+Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx,  ) const {
+    if (is_leaf(node[node_idx])){
+        Trace ret;
+        BVH<Primitive>::Node& thisnode = node[node_idx];
+        for(size_t i = thisnode.start; i < thisnode.start + thisnode.size; i++) {
+            const Primitive& prim = primatives[i];
+            Trace hit = prim.hit(ray);
+            ret = Trace::min(ret, hit);
+        }
+        return ret;
+    }
+}
+*/
 
 template<typename Primitive>
 BVH<Primitive>::BVH(std::vector<Primitive>&& prims, size_t max_leaf_size) {
