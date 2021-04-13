@@ -79,7 +79,7 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
     // The starter code sets radiance_out to (0.5,0.5,0.5) so that you can test your geometry
     // queries before you implement path tracing. You should change this to (0,0,0) and accumulate
     // the direct and indirect lighting computed below.
-    Spectrum radiance_out = Spectrum(0.5f);
+    Spectrum radiance_out = Spectrum(0.2f);
     {
         auto sample_light = [&](const auto& light) {
             // If the light is discrete (e.g. a point light), then we only need
@@ -103,6 +103,11 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
                 // TODO (PathTracer): Task 4
                 // Construct a shadow ray and compute whether the intersected surface is
                 // in shadow. Only accumulate light if not in shadow.
+                /**
+                Ray shadowray = Ray(hit.position, sample.direction);
+                shadowray.dist_bounds.x = EPS_F;
+                Trace shadowhit = scene.hit(shadowray);
+                */
 
                 // Tip: since you're creating the shadow ray at the intersection point, it may
                 // intersect the surface at time=0. Similarly, if the ray is allowed to have
@@ -113,8 +118,13 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
                 // Note: that along with the typical cos_theta, pdf factors, we divide by samples.
                 // This is because we're  doing another monte-carlo estimate of the lighting from
                 // area lights.
+
+                //NOTE: THIS really should be !shadowhit.hit
+                //if (shadowhit.hit) {
                 radiance_out +=
                     (cos_theta / (samples * sample.pdf)) * sample.radiance * attenuation;
+                //}
+                
             }
         };
 

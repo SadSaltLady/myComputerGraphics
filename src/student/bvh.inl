@@ -70,7 +70,6 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
      * - the SAH cost
      */
     Vec3 best_axis = Vec3();
-    size_t axis_idx = 4;
     size_t best_idx = 0;
     float best_SAH = INFINITY;
     size_t best1 = 0;
@@ -114,9 +113,31 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
                 eval_box1.enclose((*prim).bbox());
                 ++prim_count1;
             }
+
             for(auto prim = partition_pt; prim != prims.begin() + start + size; prim++) {
                 eval_box2.enclose((*prim).bbox());
                 ++prim_count2;
+            }
+
+            //unicentered objects
+            if (prim_count2 == 0 || prim_count1 == 0) {
+                //just divide them by half
+                size_t half = (prim_count2 + prim_count1)/2;
+                partition_pt = prims.begin() + start + half;
+                eval_box1.reset();
+                eval_box2.reset();
+                prim_count1 = 0;
+                prim_count2 = 0;
+
+                for(auto prim = prims.begin()+start; prim != partition_pt; prim++) {
+                eval_box1.enclose((*prim).bbox());
+                ++prim_count1;
+                }
+
+                for(auto prim = partition_pt; prim != prims.begin() + start + size; prim++) {
+                eval_box2.enclose((*prim).bbox());
+                ++prim_count2;
+                }
             }
             //evaluate SAH
             SAH = (prim_count1*eval_box1.surface_area()/box.surface_area()) + 
@@ -129,7 +150,6 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
                 best_SAH = SAH;
                 best1 = prim_count1;
                 best2 = prim_count2;
-                axis_idx = a;
             }
 
             //clear boxes & values
@@ -144,7 +164,7 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
     assert(best_idx != 0);
     slice_size = (dot(bbmax, best_axis) - dot(bbmin, best_axis))/bucket_size;
     amount = dot(bbmin, best_axis) + best_idx*slice_size;
-    auto partition_pt = std::partition(prims.begin() + start, prims.begin() + start + size, 
+    std::partition(prims.begin() + start, prims.begin() + start + size, 
                             [&](const Primitive& prim) -> bool { 
             return (dot(prim.bbox().center(), best_axis) < amount); }
             );
@@ -167,7 +187,7 @@ size_t BVH<Primitive>::construct(std::vector<Primitive>& prims, size_t start, si
 
 template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 
-    // TODO (PathTracer): Task 3
+    //  (PathTracer): Task 3
     // Implement ray - BVH intersection test. A ray intersects
     // with a BVH aggregate if and only if it intersects a primitive in
     // the BVH that is not an aggregate.
@@ -183,6 +203,8 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 
 template<typename Primitive> 
 Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx, Vec2& hitinfo) const {
+    //note to self: the hitinfo keep tracks of distance from the hit point to the ray origin
+    //why is it vec2? I don't know since I'm only using the max bound
     Trace ret;
     ret.origin = ray.point;
     ret.hit = false;       
@@ -190,67 +212,74 @@ Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx, Vec2& hi
     //base case where it's a leaf
     if (nodes[node_idx].is_leaf()){
         const Node& thisnode = nodes[node_idx];
+        //loop through all the primatives, find the closest hit
         for(size_t i = thisnode.start; i < thisnode.start + thisnode.size; i++) {
             const Primitive& prim = primitives[i];
             Trace hit = prim.hit(ray);
             ret = Trace::min(ret, hit);
         }
-
-        hitinfo.y = ret.distance;
+        /**
+        //check if the found intersection is the closest
+        if (hitinfo.y < ret.distance) {
+            //we already found a closer hit, dont' return this hit
+            ret.hit = false;
+            ret.distance = hitinfo.y;
+        } else {
+            //found a closer hit (or not hit)
+            //hit info records the max location of the intersection
+            hitinfo.y = ret.distance;
+        }
+        */
         return ret;
     }
-    //for all that are not a leaf...
+    //for the left and right child, check if bbox intersects
     const Node& node = nodes[node_idx];
-    const BBox& box = nodes[node_idx].bbox;
-    Vec2 times;
-    //if it doesn't hit the bounding box, return no hit & no need to recurse
-    if (!box.hit(ray,hitinfo)) {
+    const Node& node_l = nodes[node.l];
+    const Node& node_r = nodes[node.r];
+    const BBox& box_l = node_l.bbox;
+    const BBox& box_r = node_r.bbox;
+    Vec2 times_l;
+    Vec2 times_r;
+
+    //see if child boxes intersects
+    bool intersect_l = box_l.hit(ray, times_l);
+    bool intersect_r = box_r.hit(ray, times_r);
+
+    //times now should have been filled with intersect information if there's intersection.
+    //case on situations:
+    //CASE0: no intersection was found
+    if (!intersect_l && !intersect_r) {
         ret.hit = false;
         return ret;
     }
 
-    //just...work for now please
-    Trace left = find_closest_hit(ray, node.l, hitinfo);
-    Trace right = find_closest_hit(ray, node.r, hitinfo);
-
-    ret = Trace::min(left, right);
-    return ret;
-
-    /**
-    //update hitinfo
-    hitinfo = times;
-    //in order traversal, first test on the left and right subnodes
-    Vec2 left_times;
-    Vec2 right_times;
-    Vec2 first, second;
-    bool left_hit = nodes[node.l].bbox.hit(ray, left_times);
-    bool right_hit = nodes[node.r].bbox.hit(ray, right_times);
-    //find the closer one to our camera
-    const Node& first = nodes[node.l];
-    const Node& second = nodes[node.r];
-    first = left_hit;
-    second = right_hit;
-    if (right_times.x < left_times.x) {
-        first = nodes[node.r];
-        second = nodes[node.l];
-        first = right_hit;
-        second = left_hit;
-    }
-    //try to trace over the closer one first
-    Trace t_first = find_closest_hit(ray, first, hitinfo);
-    if (!t_first.hit) { //if no hit, return the next part
-        return find_closest_hit(ray, second, hitinfo);
+    //CASE1: Only left or right intersected
+    if (!intersect_l && intersect_r) { //only right intersects
+        Trace right = find_closest_hit(ray, node.r, hitinfo);
+        return right;
+    } else if (!intersect_r && intersect_l) { //only left
+        Trace left = find_closest_hit(ray, node.l, hitinfo);
+        return left;
     }
 
-    //if it hits, hit point must be infront of the smaller of right
-    float distance_first = t_first.distance;
-    float distance_second = (second.x*ray.dir).norm();
-    if (distance_second <= distance_first) {
-        Trace right = find_closest_hit(ray, node.r);
-        return Trace::min(left, right);
+    //CASE2: Both intersects
+    //find which one intersects first
+    size_t first = (times_l.x <= times_r.x) ? node.l : node.r;
+    size_t second = (times_l.x <= times_r.x) ? node.r : node.l;
+    Vec2& hitsecond = (times_l.x <= times_r.x) ? times_r : times_l;
+
+    //updates hitinfo with the distance of the closest hit found
+    Trace firsthit = find_closest_hit(ray, first, hitinfo);
+    
+    float secondhit_dist = (ray.dir*hitsecond.x).norm();
+
+    if (secondhit_dist < hitinfo.y) {
+        Trace secondhit = find_closest_hit(ray, second, hitinfo);
+        ret = Trace::min(firsthit, secondhit);
+        return ret;
     }
-    return t_first;
-    */
+
+    return firsthit;
 }
 
 

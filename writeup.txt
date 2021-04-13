@@ -1,58 +1,15 @@
 AndrewID: yunyizha
 
-EdgeCollapse:
+Pathtracer:
+Task 1 - Generating Camera Rays: Fully implemented
+Task 2 - Intersecting Triangles and Spheres: fully implemented
+Task 3 - Implementing a Bounding Volume Hierarchy (BVH): fully implemented 
+    (although it is not optimized by indepth traversal, 
+    so please use smaller ray amounts when testing, like 8 or something)
+Task 4 - Implementing Shadow Rays: 8
+not fully implemented
+everywhere it's not supposed to hit it's returning a hit. Somehow I have it completely
+backwards, but reversing how I'm checking for ray hits doesn't solve the problem. s
 
-    implemented but doesn't collapse boundary edges
-    crashes when there's overlapping faces on the same vertex
-    I tried to handle it gracefully but it seems my code isn't doing it :(
-    
-    Some documentation (also in code comments):
-    access the vertex corresponding to h0, name it checking 2
-    what I wanted to do is to loop over all halfedges coming out of an vertex(checking2) (by calling next->twin), 
-    and find the other vertex(checking2) in which the halfedge(or rather edge) resides between. 
-    
-    If ay other halfedges have the same other vertex(checking3) as the halfedges I began with (h0)
-    then that would suggest there's two edges overlapping, which is not good and my program should stop.
-
-    But it's not stopping...I don't know why
-
-    
-
-EdgeFlip:
-
-    Fully implemented.
-    
-
-EdgeSplit:
-
-    Fully implemented.
-
-FaceBevel:
-
-    Fully implemented. However results are jank on non-planar faces
-
-    Some documentation (also in code comments):
-    * tangent calculated by a projection of v's location onto the midpoint of segment v2-v0
-    * and projected onto the normal plane, such that its not modifying the normal
-
-    * normal vectors are done by calculating the cross product of v1 and v0
-
-    I noticed that in case of a vertices on the "border" when the plane folds, if you reverse the
-    the tangent and the normal(in the way I'm calculating it) you can get extrude effects like how 
-    maya does it, but I wasn't able to figure out how to detect the vertices
-
-Triangulation, LinearSubdivision, and CatmullClarkSubdivision:
-    fully implemented
-
-LoopSubdivision:
-    fully implemented
-
-3D model:
-    I dedicate my model to Emma <3
-
-Any other comments and considerations:
-
-    I also implemented eraseedge that doesn't handle on border cases, can this get extra credit?
-    I wrote all the code for simplfy cuz I thought it was cool, but didn't get it to run without errors. 
-    Can I get partial credit from this ;-; effort points? 
-    Perhaps on like correctly setting the edge_record and such. 
+in Pathtracer.cpp line 121 it really should be "if (!shadowhit.hit) {...", but if I set it like that nothing renders
+So now I know it's wrong, it doesn't render cast shadows (and renders them as light patches), but that's what I have
