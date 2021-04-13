@@ -271,6 +271,7 @@ Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx, Vec2& hi
     //updates hitinfo with the distance of the closest hit found
     Trace firsthit = find_closest_hit(ray, first, hitinfo);
     
+    
     float secondhit_dist = (ray.dir*hitsecond.x).norm();
 
     if (secondhit_dist < hitinfo.y) {
