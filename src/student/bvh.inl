@@ -37,6 +37,12 @@ void BVH<Primitive>::build(std::vector<Primitive>&& prims, size_t max_leaf_size)
     // single leaf node (which is also the root) that encloses all the
     // primitives.
 
+
+    BBox box;
+    for(const Primitive& prim : primitives) box.enclose(prim.bbox());
+
+    //new_node(box, 0, primitives.size(), 0, 0);
+    //root_idx = 0;
     size_t root = construct(primitives, 0, primitives.size(), max_leaf_size);
     root_idx = root;
 }
@@ -194,6 +200,15 @@ template<typename Primitive> Trace BVH<Primitive>::hit(const Ray& ray) const {
 
     // The starter code simply iterates through all the primitives.
     // Again, remember you can use hit() on any Primitive value.
+
+/**
+Trace ret;
+    for(const Primitive& prim : primitives) {
+        Trace hit = prim.hit(ray);
+        ret = Trace::min(ret, hit);
+    }
+    return ret;
+*/  
     Vec2 hitinfo = Vec2(0.0f, ray.dist_bounds.y);
     Trace ret = find_closest_hit(ray, root_idx, hitinfo);
 
@@ -205,10 +220,7 @@ template<typename Primitive>
 Trace BVH<Primitive>::find_closest_hit(const Ray& ray, size_t node_idx, Vec2& hitinfo) const {
     //note to self: the hitinfo keep tracks of distance from the hit point to the ray origin
     //why is it vec2? I don't know since I'm only using the max bound
-    Trace ret;
-    ret.origin = ray.point;
-    ret.hit = false;       
-    ret.distance = INFINITY;   
+    Trace ret; 
     //base case where it's a leaf
     if (nodes[node_idx].is_leaf()){
         const Node& thisnode = nodes[node_idx];

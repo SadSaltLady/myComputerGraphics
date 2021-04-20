@@ -7,7 +7,7 @@ namespace Samplers {
 
 Vec2 Rect::Uniform::sample(float& pdf) const {
 
-    // TODO (PathTracer): Task 1
+    // (PathTracer): Task 1
     // Generate a uniformly random point on a rectangle of size size.x * size.y
     // Tip: RNG::unit()
 
@@ -28,8 +28,20 @@ Vec3 Sphere::Uniform::sample(float& pdf) const {
     // Generate a uniformly random point on the unit sphere (or equivalently, direction)
     // Tip: start with Hemisphere::Uniform
 
-    pdf = 1.0f; // what was the PDF at the chosen direction?
-    return Vec3();
+    float Xi1 = RNG::unit();
+    float Xi2 = RNG::unit();
+
+    float theta = std::acos(1.f - 2.f* Xi1);
+    float phi = 2.0f * PI_F * Xi2;
+
+    float xs = std::sin(theta) * std::cos(phi);
+    float ys = std::cos(theta);
+    float zs = std::sin(theta) * std::sin(phi);
+    
+    //chance to flip everything so it's a sphere
+    //:P
+    pdf = 1.0f / (4.0f * PI_F);
+    return Vec3(xs, ys, zs);
 }
 
 Sphere::Image::Image(const HDR_Image& image) {

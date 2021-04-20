@@ -45,7 +45,7 @@ Trace Triangle::hit(const Ray& ray) const {
     (void)v_1;
     (void)v_2;
 
-    // TODO (PathTracer): Task 2
+    //(PathTracer): Task 2
     // Intersect this ray with a triangle defined by the three above points.
     // method: the faster one (Moller-Trumbore algorithm)
     Vec3 e1 = v_1.position - v_0.position;
@@ -68,24 +68,55 @@ Trace Triangle::hit(const Ray& ray) const {
      * https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering
      * -a-triangle/moller-trumbore-ray-triangle-intersection
      */
+    //almost zero
+    if (abs(denominator) <= 1e-4) {
+        return ret;
+    }
+    float denominator_i = 1.0f / denominator;
+    /**
+    Vec3 s_x_e2 = cross(e2, S);
+    float t = dot(s_x_e2, e1) * denominator_i;
+    float sign = (t >= 0) ? 1.0f : 0.0f;
+	if ((float)ray.at(t).norm()*sign < ray.dist_bounds.x || (float)ray.at(t).norm()*sign > ray.dist_bounds.y) {
+		return ret;
+    }
 
-    if (denominator == 0.0f) {
+    float u = dot(s_x_e2, ray.dir) * denominator_i;
+	if (u < 0 || u > 1) {
         return ret;
     }
 
+    float v = dot(cross(e1, ray.dir), S) * denominator_i;
+	if (v < 0 || v > 1 || u + v > 1)
+		return ret;
+    
+    ray.dist_bounds.y = (float)ray.at(t).norm()*sign;
+    Vec3 n = (1.0f - u - v)*v_0.normal + u * v_1.normal + v * v_2.normal;
+
+	ret.origin = ray.point;
+    ret.hit = true;       // yes intersection
+    ret.position = ray.at(t); 
+    ret.distance = (float)ray.at(t).norm()*sign;
+    //interpolated between the three vertex normals
+    ret.normal = dot(n, ray.dir) < 0 ? n : -n;
+    return ret;
+    //old code:
+    */
     //construct the matrix for cramer's 
     float m_x = -(dot(cross(S, e2), ray.dir));
     float m_y = dot(cross(e1, ray.dir), S);
     float m_z = -(dot(cross(S, e2), e1));
     Vec3 m = Vec3(m_x, m_y, m_z);
     //calcualte for {u, v, t}
-    Vec3 uvt = m / denominator;
+    Vec3 uvt = m * denominator_i;
 
     Vec3 intersect_pos = ray.point + (uvt.z * ray.dir); //location from param ray
-    float intersect_dist = (intersect_pos - ray.point).norm();
+    size_t sign = (0 <= uvt.z)? 1 : -1;
+    float intersect_dist = (intersect_pos - ray.point).norm() * sign; //should preserve sign as well hmm
 
     //if collision occured outside of ray dist_bounds, it is invalid
-    if (intersect_dist < ray.dist_bounds.x || intersect_dist > ray.dist_bounds.y) {
+    if (uvt.z < ray.dist_bounds.x || uvt.z > ray.dist_bounds.y) {
+        ret.hit = false;
         return ret;
     }
 
@@ -110,8 +141,9 @@ Trace Triangle::hit(const Ray& ray) const {
     //@TOASK: How should I update the ray bounds?
     //THOUGHT: set max to the current point we have calculated
     //update ray bounds, setting max to current pt of intersection
-    ray.dist_bounds.y = intersect_dist;
+    ray.dist_bounds.y = uvt.z;
     return ret;
+    
 }
 
 Triangle::Triangle(Tri_Mesh_Vert* verts, unsigned int v0, unsigned int v1, unsigned int v2)

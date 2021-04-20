@@ -11,7 +11,7 @@ Spectrum Pathtracer::trace_pixel(size_t x, size_t y) {
     Vec2 xy((float)x, (float)y);
     Vec2 wh((float)out_w, (float)out_h);
 
-    // TODO (PathTracer): Task 1
+    // (PathTracer): Task 1
 
     // Generate a sample within the pixel with coordinates xy and return the
     // incoming light using trace_ray.
@@ -39,7 +39,7 @@ Spectrum Pathtracer::trace_pixel(size_t x, size_t y) {
 
     Ray out = camera.generate_ray(cameraspace);
 
-    if(RNG::coin_flip(0.0005f)) log_ray(out, 5.0f);
+    //if(RNG::coin_flip(0.0005f)) log_ray(out, 5.0f); //DEBUG
     return trace_ray(out);
 }
 
@@ -79,7 +79,8 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
     // The starter code sets radiance_out to (0.5,0.5,0.5) so that you can test your geometry
     // queries before you implement path tracing. You should change this to (0,0,0) and accumulate
     // the direct and indirect lighting computed below.
-    Spectrum radiance_out = Spectrum(0.2f);
+
+    Spectrum radiance_out = Spectrum(0.0f); 
     {
         auto sample_light = [&](const auto& light) {
             // If the light is discrete (e.g. a point light), then we only need
@@ -100,14 +101,16 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
                 Spectrum attenuation = bsdf.evaluate(out_dir, in_dir);
                 if(attenuation.luma() == 0.0f) continue;
 
-                // TODO (PathTracer): Task 4
+                // TODO (PathTracer): Task 4s
                 // Construct a shadow ray and compute whether the intersected surface is
                 // in shadow. Only accumulate light if not in shadow.
-                /**
-                Ray shadowray = Ray(hit.position, sample.direction);
+                
+                
+                Ray shadowray = Ray(hit.position, sample.direction.unit());
                 shadowray.dist_bounds.x = EPS_F;
+                shadowray.dist_bounds.y = sample.distance - EPS_F;
                 Trace shadowhit = scene.hit(shadowray);
-                */
+                
 
                 // Tip: since you're creating the shadow ray at the intersection point, it may
                 // intersect the surface at time=0. Similarly, if the ray is allowed to have
@@ -120,10 +123,10 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
                 // area lights.
 
                 //NOTE: THIS really should be !shadowhit.hit
-                //if (shadowhit.hit) {
-                radiance_out +=
+                if (!shadowhit.hit) {
+                    radiance_out +=
                     (cos_theta / (samples * sample.pdf)) * sample.radiance * attenuation;
-                //}
+                }
                 
             }
         };
@@ -139,24 +142,49 @@ Spectrum Pathtracer::trace_ray(const Ray& ray) {
     // TODO (PathTracer): Task 5
     // Compute an indirect lighting estimate using pathtracing with Monte Carlo.
 
-    // (1) Ray objects have a depth field; if it reaches max_depth, you should
-    // terminate the path.
 
     // (2) Randomly select a new ray direction (it may be reflection or transmittance
     // ray depending on surface type) using bsdf.sample()
+    auto sample_brdf = bsdf.sample(out_dir);
+
+
+    // (1) Ray objects have a depth field; if it reaches max_depth, you should
+    // terminate the path.
+    if (ray.depth >= max_depth) {
+        return radiance_out + sample_brdf.emissive; //maybe add emissive
+    }
+    Vec3 in_dir = sample_brdf.direction;
+    //convert direction to world space (normalized)
+    Vec3 new_dir_world = (object_to_world.rotate(sample_brdf.direction)).unit();
+    //generate new ray from current position to the world space
 
     // (3) Compute the throughput of the recursive ray. This should be the current ray's
     // throughput scaled by the BSDF attenuation, cos(theta), and inverse BSDF sample PDF.
     // Potentially terminate the path using Russian roulette as a function of the new throughput.
     // Note that allowing the termination probability to approach 1 may cause extra speckling.
+    //@toask what is this cos theta
+    auto throughput = ray.throughput * sample_brdf.attenuation * std::abs(in_dir.y) * (1.0f / sample_brdf.pdf);
+    float terminateProbability = 1.f - clamp(throughput.luma(), 0.0f, 1.0f); 
+    //smaller/dimmer ray has a higher chance of being terminated
+    if (RNG::unit() < terminateProbability) {
+        return radiance_out + sample_brdf.emissive;
+    }
 
-    // (4) Create new scene-space ray and cast it to get incoming light. As with shadow rays, you
+    // (4) Create new scene-space ray and cast it to get incoming light. As wisth shadow rays, you
     // should modify time_bounds so that the ray does not intersect at time = 0. Remember to
     // set the new throughput and depth values.
 
+    Ray new_ray = Ray(hit.position + new_dir_world * EPS_F, new_dir_world);
+    new_ray.throughput = throughput; //??
+    new_ray.dist_bounds.x = EPS_F;
+    new_ray.depth = ray.depth + 1;
+
     // (5) Add contribution due to incoming light with proper weighting. Remember to add in
     // the BSDF sample emissive term.
-    return radiance_out;
+
+    return radiance_out + sample_brdf.emissive + trace_ray(new_ray) * sample_brdf.attenuation * std::abs(in_dir.y) 
+            / (sample_brdf.pdf * (1 - terminateProbability));
+
 }
 
 } // namespace PT

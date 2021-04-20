@@ -15,7 +15,7 @@ bool BBox::hit(const Ray& ray, Vec2& times) const {
 
     //does the ray pass through the box
 
-        Vec3 invdir = 1 / ray.dir;
+    Vec3 invdir = 1 / ray.dir;
     float tmin, tmax, tymin, tymax, tzmin, tzmax;
     tmin = (min.x - ray.point.x) * invdir.x;
     tmax = (max.x - ray.point.x) * invdir.x;

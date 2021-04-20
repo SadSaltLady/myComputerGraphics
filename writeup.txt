@@ -4,12 +4,7 @@ Pathtracer:
 Task 1 - Generating Camera Rays: Fully implemented
 Task 2 - Intersecting Triangles and Spheres: fully implemented
 Task 3 - Implementing a Bounding Volume Hierarchy (BVH): fully implemented 
-    (although it is not optimized by indepth traversal, 
-    so please use smaller ray amounts when testing, like 8 or something)
-Task 4 - Implementing Shadow Rays: 8
-not fully implemented
-everywhere it's not supposed to hit it's returning a hit. Somehow I have it completely
-backwards, but reversing how I'm checking for ray hits doesn't solve the problem. s
-
-in Pathtracer.cpp line 121 it really should be "if (!shadowhit.hit) {...", but if I set it like that nothing renders
-So now I know it's wrong, it doesn't render cast shadows (and renders them as light patches), but that's what I have
+Task 4 - Implementing Shadow Rays: fully implemented
+Task 5 - fully implemented
+task 6 - fully implemented
+task 7 - not implemented
