@@ -5,8 +5,8 @@
       <author>Assimp</author>
       <authoring_tool>Assimp Exporter</authoring_tool>
     </contributor>
-    <created>2021-04-19T19:25:57</created>
-    <modified>2021-04-19T19:25:57</modified>
+    <created>2021-04-20T20:52:56</created>
+    <modified>2021-04-20T20:52:56</modified>
     <unit name="meter" meter="1" />
     <up_axis>Y_UP</up_axis>
   </asset>
@@ -15,8 +15,8 @@
       <optics>
         <technique_common>
           <perspective>
-            <xfov sid="xfov">121.28449</xfov>
-            <aspect_ratio>1.7777778</aspect_ratio>
+            <xfov sid="xfov">121.14855</xfov>
+            <aspect_ratio>1.7728531</aspect_ratio>
             <znear sid="znear">0</znear>
             <zfar sid="zfar">1</zfar>
           </perspective>
@@ -36,6 +36,19 @@
       </optics>
     </camera>
   </library_cameras>
+  <library_lights>
+    <light id="Sphere_Light_14-S3D-SPHERE-14-light" name="Sphere_Light_14-S3D-SPHERE-14" >
+      <technique_common>
+        <ambient>
+          <env_map>C:\Users\Joyce Z\Documents\15462-ComputerGraphics\Scotty3D\asst3_exr_archive\ennis.exr</env_map>
+          <color sid="color">1 1 1</color>
+          <constant_attenuation>0</constant_attenuation>
+          <linear_attenuation>1</linear_attenuation>
+          <quadratic_attenuation>1</quadratic_attenuation>
+        </ambient>
+      </technique_common>
+    </light>
+  </library_lights>
   <library_images>
   </library_images>
   <library_effects>
@@ -110,12 +123,16 @@
           </bind_material>
         </instance_geometry>
       </node>
+      <node id="Sphere_Light_14-S3D-SPHERE-14" name="Sphere_Light_14-S3D-SPHERE-14" type="NODE">
+        <matrix sid="matrix">1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1</matrix>
+        <instance_light url="#Sphere_Light_14-S3D-SPHERE-14-light"/>
+      </node>
       <node id="S3D-ANIM_CAM_NODE" name="S3D-ANIM_CAM_NODE" type="NODE">
-        <matrix sid="matrix">0.70710677 -0.49999955 0.5000006 2.5000007 -2.9802322e-08 0.70710754 0.70710605 3.5355339 -0.70710695 -0.49999946 0.50000048 2.5000007 0 0 0 1</matrix>
+        <matrix sid="matrix">0.70710665 -0.49999949 0.50000054 2.500001 -2.9802319e-08 0.70710754 0.70710599 3.5355337 -0.70710689 -0.49999937 0.50000042 2.5000005 0 0 0 1</matrix>
         <instance_camera url="#S3D-ANIM_CAM_NODE-camera"/>
       </node>
       <node id="S3D-RENDER_CAM_NODE" name="S3D-RENDER_CAM_NODE" type="NODE">
-        <matrix sid="matrix">0.49697101 -0.54138279 0.67817718 2.3736172 5.9604631e-08 0.78151995 0.62388021 2.1835775 -0.86776704 -0.31005031 0.38839281 1.3593861 0 0 0 1</matrix>
+        <matrix sid="matrix">0.88620299 -0.14777352 0.43910021 0.76841921 -7.4505992e-09 0.94776797 0.3189618 0.55817872 -0.46329907 -0.28266519 0.83991474 1.4698532 0 0 0 1</matrix>
         <instance_camera url="#S3D-RENDER_CAM_NODE-camera"/>
       </node>
     </visual_scene>

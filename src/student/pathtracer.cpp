@@ -39,7 +39,7 @@ Spectrum Pathtracer::trace_pixel(size_t x, size_t y) {
 
     Ray out = camera.generate_ray(cameraspace);
 
-    //if(RNG::coin_flip(0.0005f)) log_ray(out, 5.0f); //DEBUG
+    if(RNG::coin_flip(0.00005f)) log_ray(out, 5.0f); //DEBUG
     return trace_ray(out);
 }
 

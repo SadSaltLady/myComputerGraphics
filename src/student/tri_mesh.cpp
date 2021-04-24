@@ -56,9 +56,7 @@ Trace Triangle::hit(const Ray& ray) const {
     ret.origin = ray.point;
     ret.hit = false;       // was there an intersection?
     ret.distance = 0.0f;   // at what distance did the intersection occur?
-    ret.position = Vec3{}; // where was the intersection?
-    ret.normal = Vec3{};   // what was the surface normal at the intersection?
-                           // (this should be interpolated between the three vertex normals)
+
 
     //calculate for (e1 x d) dot e2
     float denominator = dot(cross(e1, ray.dir), e2);
@@ -69,7 +67,7 @@ Trace Triangle::hit(const Ray& ray) const {
      * -a-triangle/moller-trumbore-ray-triangle-intersection
      */
     //almost zero
-    if (abs(denominator) <= 1e-4) {
+    if (abs(denominator) <= EPS_F) {
         return ret;
     }
     float denominator_i = 1.0f / denominator;
@@ -110,9 +108,6 @@ Trace Triangle::hit(const Ray& ray) const {
     //calcualte for {u, v, t}
     Vec3 uvt = m * denominator_i;
 
-    Vec3 intersect_pos = ray.point + (uvt.z * ray.dir); //location from param ray
-    size_t sign = (0 <= uvt.z)? 1 : -1;
-    float intersect_dist = (intersect_pos - ray.point).norm() * sign; //should preserve sign as well hmm
 
     //if collision occured outside of ray dist_bounds, it is invalid
     if (uvt.z < ray.dist_bounds.x || uvt.z > ray.dist_bounds.y) {
@@ -120,13 +115,15 @@ Trace Triangle::hit(const Ray& ray) const {
         return ret;
     }
 
+    Vec3 intersect_pos = ray.point + (uvt.z * ray.dir); //location from param ray
+
     //if collision occured outside of the triangle (1-u-v > 0),  it is invalid
     //also x and y has to be strictly between 0 & 1
     //x and y has to be between in 0-1
     if (uvt.x < 0.0f || uvt.x > 1.0f || uvt.y < 0.0f || uvt.y > 1.0f) {
         return ret;
     }
-    if (1 - uvt.x - uvt.y < 0.0f || 1 - uvt.x - uvt.y > 1.0f) {
+    if (uvt.x + uvt.y > 1.0f) {
         return ret;
     }
 
@@ -134,7 +131,7 @@ Trace Triangle::hit(const Ray& ray) const {
     ret.origin = ray.point;
     ret.hit = true;       // yes intersection
     ret.position = intersect_pos; 
-    ret.distance = intersect_dist;
+    ret.distance = uvt.z;
     //interpolated between the three vertex normals
     ret.normal = (1 - uvt.x - uvt.y)*v_0.normal + uvt.x * v_1.normal + uvt.y * v_2.normal;
 

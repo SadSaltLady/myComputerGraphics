@@ -4,6 +4,7 @@
 
 #include <sf_libs/stb_image.h>
 #include <sf_libs/tinyexr.h>
+#include <iostream>
 
 HDR_Image::HDR_Image() : w(0), h(0) {
 }
@@ -59,6 +60,15 @@ Spectrum& HDR_Image::at(size_t x, size_t y) {
 }
 
 Spectrum HDR_Image::at(size_t x, size_t y) const {
+    if(x >= w) {
+        std::cout << x << "\n";
+        std::cout << w << "\n";
+    }
+
+    if(y >= h) {
+        std::cout << y << "\n";
+        std::cout << h << "\n";
+    }
     assert(x < w && y < h);
     size_t idx = y * w + x;
     return pixels[idx];

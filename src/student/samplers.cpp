@@ -27,21 +27,24 @@ Vec3 Sphere::Uniform::sample(float& pdf) const {
     // TODO (PathTracer): Task 7
     // Generate a uniformly random point on the unit sphere (or equivalently, direction)
     // Tip: start with Hemisphere::Uniform
-
     float Xi1 = RNG::unit();
     float Xi2 = RNG::unit();
 
-    float theta = std::acos(1.f - 2.f* Xi1);
+    float theta = std::acos(Xi1);
     float phi = 2.0f * PI_F * Xi2;
 
     float xs = std::sin(theta) * std::cos(phi);
     float ys = std::cos(theta);
     float zs = std::sin(theta) * std::sin(phi);
-    
+
     //chance to flip everything so it's a sphere
     //:P
+    Vec3 ret = Vec3(xs, ys, zs).unit();
+    if (RNG::unit() <= 0.5f) {
+        ret = -1.f * ret;
+    }
     pdf = 1.0f / (4.0f * PI_F);
-    return Vec3(xs, ys, zs);
+    return ret;
 }
 
 Sphere::Image::Image(const HDR_Image& image) {
@@ -55,6 +58,37 @@ Sphere::Image::Image(const HDR_Image& image) {
     const auto [_w, _h] = image.dimension();
     w = _w;
     h = _h;
+
+    float pdfsum = 0.f;
+    float cdfsum = 0.f;
+    float p_pdf;
+
+    //row major(first row then second row...)
+    for (size_t col = 0; col < h; col++) {
+        for (size_t row = 0; row < w; row++ ) {
+
+            //size_t idx = col * w + row;
+
+            const Spectrum& pixel = image.at(row, col);
+            float theta = std::acos((float)(col / h));
+
+            //calculate the pdf corresonding to each pixel
+            p_pdf = (pixel.luma() * sinf(theta) * 2 * PI_F * PI_F) /(w * h);
+            assert(p_pdf >= 0.f);
+            pdfsum += p_pdf;
+            pdf.push_back(p_pdf);
+        }
+    }
+    assert(pdf.size() ==  w * h);
+    //normalize all the samples taken
+    size_t i = 0;
+    for (auto &start :pdf) {
+        start = start/pdfsum;
+        cdfsum += start;
+        cdf.push_back(cdfsum);
+        i++;
+    }
+
 }
 
 Vec3 Sphere::Image::sample(float& out_pdf) const {
@@ -63,8 +97,25 @@ Vec3 Sphere::Image::sample(float& out_pdf) const {
     // Use your importance sampling data structure to generate a sample direction.
     // Tip: std::upper_bound can easily binary search your CDF
 
-    out_pdf = 1.0f; // what was the PDF (again, PMF here) of your chosen sample?
-    return Vec3();
+    //randomly sample
+    float Xi1 = RNG::unit();
+
+    //find the sample & retrive w and height index
+    auto theta_idx = std::upper_bound(cdf.begin(), cdf.end(), Xi1) - cdf.begin();
+    float w_idx = (float)(theta_idx % w);
+    float h_idx = (float)(theta_idx / w);
+
+    float theta = ((float)h - h_idx) / (float)h * PI_F;
+    float phi = 2.0f * PI_F * (w_idx / (float) w);
+
+    float xs = std::sin(theta) * std::cos(phi);
+    float ys = std::cos(theta);
+    float zs = std::sin(theta) * std::sin(phi);
+    
+    //need to find theta and phi
+
+    out_pdf = pdf[theta_idx]; // what was the PDF (again, PMF here) of your chosen sample?
+    return Vec3(xs, ys, zs).unit();
 }
 
 Vec3 Point::sample(float& pmf) const {

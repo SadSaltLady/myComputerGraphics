@@ -7,4 +7,34 @@ Task 3 - Implementing a Bounding Volume Hierarchy (BVH): fully implemented
 Task 4 - Implementing Shadow Rays: fully implemented
 Task 5 - fully implemented
 task 6 - fully implemented
-task 7 - not implemented
+task 7 - partially implemented
+task 8 - attached render.png
+
+fully implemented spherical sampling (part1)
+For part 2, I wrote the code, but I'm encountering a vector out of bound error
+I can't quite find what's causing it, and I'm running out of time, 
+you're welcome to look at my code, and I will be writing the pseudo code here:
+
+>>In Sphere::Image::Image(const HDR_Image& image)
+Loop through every pixel in the image
+    for each pixel:
+    calculat the pdf by luma()*sin(theta)*2*(pi^2) / (w*h)
+    set the pdf at the corresponding index to be the calcualted value
+    accumalte the total pdf in some variable pdf_sum
+
+For each  pdf value:
+    normalize it with pdf_sum
+    set the cdf at that index to be the sum of all normalized pdf values before it
+
+
+>>In Vec3 Sphere::Image::sample(float& out_pdf)
+
+take a random sample between 0-1
+using the cdf vector, find the index corresponding to the sample we took
+set the pdf to be the corresponding pdf at the index
+from that index, find the x and y values
+
+convert the x and y into theta and phi
+find the xyz vector corresponding to the theta and phi;
+
+return the found vector
