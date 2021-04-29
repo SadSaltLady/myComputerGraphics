@@ -108,6 +108,8 @@ public:
 
     Mat4 joint_to_bind(const Joint* j) const;
     Mat4 joint_to_posed(const Joint* j) const;
+    //update position of all joints based on step and angle_gradient, then zero out angle gradient
+    void update_and_zero(Joint* j, float step);
 
     void find_joints(const GL::Mesh& src,
                      std::unordered_map<unsigned int, std::vector<Joint*>>& map);

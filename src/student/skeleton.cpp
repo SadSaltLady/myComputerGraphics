@@ -20,7 +20,16 @@ Mat4 Joint::joint_to_bind() const {
 
     // You will need to traverse the joint heirarchy. This should
     // not take into account Skeleton::base_pos
-    return Mat4::I;
+    
+
+    //in short: just acculate all the translation information
+    if (is_root()){
+        return Mat4::I;
+    }
+
+    Mat4 L = Mat4::translate(parent->extent);
+
+    return L * parent->joint_to_bind();
 }
 
 Mat4 Joint::joint_to_posed() const {
@@ -32,7 +41,15 @@ Mat4 Joint::joint_to_posed() const {
 
     // You will need to traverse the joint heirarchy. This should
     // not take into account Skeleton::base_pos
-    return Mat4::I;
+    
+    //recursive?
+    if (is_root()){
+        return Mat4::euler(pose);
+    }
+
+    Mat4 LR = Mat4::translate(parent->extent) * Mat4::euler(pose);
+
+    return parent->joint_to_posed() * LR;
 }
 
 Vec3 Skeleton::end_of(Joint* j) {
@@ -41,7 +58,10 @@ Vec3 Skeleton::end_of(Joint* j) {
 
     // Return the bind position of the endpoint of joint j in object space.
     // This should take into account Skeleton::base_pos.
-    return Vec3{};
+
+    Mat4 bind_transform = j->joint_to_bind();
+    
+    return bind_transform * j->extent + base_pos;
 }
 
 Vec3 Skeleton::posed_end_of(Joint* j) {
@@ -50,16 +70,21 @@ Vec3 Skeleton::posed_end_of(Joint* j) {
 
     // Return the posed position of the endpoint of joint j in object space.
     // This should take into account Skeleton::base_pos.
-    return Vec3{};
+    Mat4 bind_transform = j->joint_to_posed();
+    return  bind_transform * j->extent + base_pos;
 }
 
 Mat4 Skeleton::joint_to_bind(const Joint* j) const {
 
-    // TODO(Animation): Task 2
+    // TODO(Animation): Task 2   
 
     // Return a matrix transforming points in joint j's space to object space in
     // bind position. This should take into account Skeleton::base_pos.
-    return Mat4::I;
+
+    Mat4 trans = j->joint_to_bind();
+    Mat4 base = Mat4::translate(base_pos);
+
+    return base * trans;
 }
 
 Mat4 Skeleton::joint_to_posed(const Joint* j) const {
@@ -68,7 +93,12 @@ Mat4 Skeleton::joint_to_posed(const Joint* j) const {
 
     // Return a matrix transforming points in joint j's space to object space with
     // poses. This should take into account Skeleton::base_pos.
-    return Mat4::I;
+
+    
+    Mat4 trans = j->joint_to_posed();
+    Mat4 base = Mat4::translate(base_pos);
+
+    return base * trans ;
 }
 
 void Skeleton::find_joints(const GL::Mesh& mesh,
@@ -123,6 +153,27 @@ void Joint::compute_gradient(Vec3 target, Vec3 current) {
 
     // Target is the position of the IK handle in skeleton space.
     // Current is the end position of the IK'd joint in skeleton space.
+    //BASE CASE
+    if (is_root()) {
+        return;
+    }
+
+    Vec3 diff = target - current;
+    Mat4 to_world = parent->joint_to_posed();
+    Vec3 p = current - to_world*parent->extent;
+    Vec3 j_x = cross(to_world*Vec3(1,0,0), p);
+    Vec3 j_y = cross(to_world*Vec3(0,1,0), p);
+    Vec3 j_z = cross(to_world*Vec3(0,0,1), p);
+
+
+    Vec3 grad = Vec3();
+    grad.x = dot(j_x, diff);
+    grad.y = dot(j_y, diff);
+    grad.z = dot(j_z, diff);
+
+    angle_gradient += grad;
+
+    parent->compute_gradient(target, current);
 }
 
 void Skeleton::step_ik(std::vector<IK_Handle*> active_handles) {
@@ -130,4 +181,40 @@ void Skeleton::step_ik(std::vector<IK_Handle*> active_handles) {
     // TODO(Animation): Task 2
 
     // Do several iterations of Jacobian Transpose gradient descent for IK
+    size_t step_count = 100;
+    float step = 0.01;
+    //for every time stamp
+    for (size_t i = 0; i < step_count; i++){
+        //for everY ik handle
+        for (auto iter = active_handles.begin(); iter != active_handles.end(); iter++) {
+            IK_Handle* IK = *iter;
+            //for every effected joint in IK handle, update the gradient
+            Joint* endjoint = IK->joint;
+            Vec3 endpoint = posed_end_of(endjoint) - base_pos;
+            IK->joint->compute_gradient(IK->target, endpoint);
+        }
+
+        //update the position of all the joints, and zero out the gradient
+        for (auto iter = active_handles.begin(); iter != active_handles.end(); iter++) {
+            IK_Handle* IK = *iter;
+            //for every effected joint in IK handle, update the gradient
+            Joint* endjoint = IK->joint;
+            update_and_zero(endjoint, step);
+        }
+    }
+
+}
+
+void Skeleton::update_and_zero(Joint* j, float step) {
+    if (j->is_root()) {
+        j->angle_gradient = Vec3();
+        return;
+    }
+    //update
+    Vec3 increm = j->angle_gradient*step;
+    j->pose += increm;
+    //zerp
+    j->angle_gradient = Vec3();
+    //call on parent
+    update_and_zero(j->parent, step);
 }
