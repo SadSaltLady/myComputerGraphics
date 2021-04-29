@@ -10,7 +10,7 @@ permalink: /animation/skeleton_kinematics
 
 A `Skeleton`(defined in `scene/skeleton.h`) is what we use to drive our animation. You can think of them like the set of bones we have in our own bodies and joints that connect these bones. For convenience, we have merged the bones and joints into the `Joint` class which holds the orientation of the joint relative to its parent as euler angle in its `pose`, and `extent` representing the direction and length of the bone with respect to its parent `Joint`. Each `Mesh` has an associated `Skeleton` class which holds a rooted tree of `Joint`s, where each `Joint` can have an arbitrary number of children.
 
-All of our joints are ball `Joint`s which have a set of 3 rotations around the <img src="task2_media/0027.png" style="height:14px">, <img src="task2_media/0028.png" style="height: 16px">, and <img src="task2_media/0029.png" style="height: 16px"> axes, called _Euler angles_. Whenever you deal with angles in this way, a fixed order of operations must be enforced, otherwise the same set of angles will not represent the same rotation. In order to get the full rotational transformation matrix, <img src="task2_media/0030.png" style="height:16px">, we can create individual rotation matrices around the <img src="task2_media/0031.png" style="height:16px">, <img src="task2_media/0032.png" style="height:16px">, and <img src="task2_media/0033.png" style="height:16px"> axes, which we call <img src="task2_media/0034.png" style="height:20px">, <img src="task2_media/0035.png" style="height:20px">, and <img src="task2_media/0036.png" style="height:20px"> respectively. The particular order of operations that we adopted for this assignment is that <img src="task2_media/0037.png" style="height:20px">.
+All of our joints are ball `Joint`s which have a set of 3 rotations around the <img src="task2_media/0027.png" style="height:14px">, <img src="task2_media/0028.png" style="height: 16px">, and <img src="task2_media/0029.png" style="height: 16px"> axes, called _Euler angles_. Whenever you deal with angles in this way, a fixed order of operations must be enforced, otherwise the same set of angles will not represent the same rotation. In order to get the full rotational transformation matrix, <img src="task2_media/0030.png" style="height:16px">, we can create individual rotation matrices around the <img src="task2_media/0031.png" style="height:16px">, <img src="task2_media/0032.png" style="height:16px">, and <img src="task2_media/0033.png" style="height:16px"> axes, which we call <img src="task2_media/0034.png" style="height:20px">, <img src="task2_media/0035.png" style="height:20px">, and <img src="task2_media/0036.png" style="height:20px"> respectively. The particular order of operations that we adopted for this assignment is that <img src="task2_media/task2_rotations.PNG" style="height:20px">.
 
 ### Forward Kinematics
 
@@ -23,7 +23,7 @@ When a joint's parent is rotated, that transformation should be propagated down 
 You need to implement these routines in `student/skeleton.cpp` for forward kinematics.
 
 *   `Joint::joint_to_bind`
-    Rreturn a matrix transforming points in the space of this joint
+    Return a matrix transforming points in the space of this joint
     to points in mesh space in bind position  up to the base of this joint (end of its parent joint). You should traverse upwards from this joint's parent all the way up to the root joint and accumulate their transformations.
 *   `Joint::joint_to_posed`
     Return a matrix transforming points in the space of this joint to points in mesh space, taking into account joint poses. Again, you should traverse upwards from this joint's parent to the root joint.
@@ -32,7 +32,7 @@ You need to implement these routines in `student/skeleton.cpp` for forward kinem
 *   `Skeleton::posed_end_of`
     Returns the end position of the joint in world coordinate frame with poses, and you should take into account `Skeleton::base_pos`.
 *   `Skeleton::joint_to_bind`
-    Rreturn a matrix transforming points in the space of this joint
+    Return a matrix transforming points in the space of this joint
     to points in mesh space in bind position but with the base position of the skeleton taken in to account. Hint: use some function that you have implemented wisely!
 *   `Skeleton::joint_to_posed`
     Return a matrix transforming points in the space of this joint to points in mesh space, taking into account joint poses but with the base position of the skeleton taken in to account. Hint: use some function that you have implemented wisely!
@@ -92,7 +92,7 @@ which is a simple extension actually. Since each term is independent and added t
 
 You should implement multi-target IK, which will take a `vector` of `IK_Handle*`s called `active_handles` which stores the information a target point for a joint. See `scene/skeleton.h` for the definition of `IK_Handle` structure.
 
-In order to implement this, you should update `Joint::compute_gradient` and `Skeleton::step_ik`. `Joint::compute_gradient` should calculate the gradient of <img src="task2_media/0079.png" style="height:18px"> in the x,y, and z directions, and add them to `Joint::angle_gradient` for all relevant joints. `Skeleton::step_ik` should actually do the gradient descent calculations and update the `pose` of each joint. In this function, you should probably use a very small timestep, but do several iterations (say, 10s to 100s) of gradient descent in order to speed things up. For even faster and better results, you can also implement a variable timestep instead of just using a fixed one. Note also that the root joint should never be updated.
+In order to implement this, you should update `Joint::compute_gradient` and `Skeleton::step_ik`. `Joint::compute_gradient` should calculate the gradient of <img src="task2_media/0079.png" style="height:18px"> in the x,y, and z directions, and add them to `Joint::angle_gradient` for all relevant joints. `Skeleton::step_ik` should actually do the gradient descent calculations and update the `pose` of each joint. In this function, you should use a small timestep, but do several iterations (say, 10s to 100s) of gradient descent in order to speed things up. For even faster and better results, you can also implement a variable timestep instead of a fixed one. Finally, also note that the gradient descent should never effect `Skeleton::base_pos`.
 
 A key thing for this part is to _remember what coordinate frame you're in_, because if you calculate the gradients in the wrong coordinate frame or use the axis of rotation in the wrong coordinate frame your answers will come out very wrong!
 
