@@ -161,11 +161,13 @@ void Joint::compute_gradient(Vec3 target, Vec3 current) {
     Vec3 diff = target - current;
     Mat4 to_world = parent->joint_to_posed();
     Vec3 p = current - to_world*parent->extent;
+ 
+    //calculate the jacobian for each axis
     Vec3 j_x = cross(to_world*Vec3(1,0,0), p);
     Vec3 j_y = cross(to_world*Vec3(0,1,0), p);
     Vec3 j_z = cross(to_world*Vec3(0,0,1), p);
 
-
+    //calculate the gradient for each axis
     Vec3 grad = Vec3();
     grad.x = dot(j_x, diff);
     grad.y = dot(j_y, diff);

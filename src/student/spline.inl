@@ -58,9 +58,10 @@ template<typename T> T Spline<T>::at(float time) const {
     //have more points...
     auto pfirst = control_points.begin(); //assumed first point
     auto plast = std::prev(control_points.end()); //assumed last
-
-    float what = plast->first;
-    T w = plast->second;
+    
+    //debug
+    //float what = plast->first;
+    //T w = plast->second;
     //std::cout << "plast t: " << what << "\n";
     
     //if inquiry point before/after first/last
@@ -73,11 +74,14 @@ template<typename T> T Spline<T>::at(float time) const {
 
     //if inquiry point is between first and last
     //std::cout << "size of spline : " << count << "\n";
+    //debug
+    /**
     for (auto it = control_points.begin(); it != control_points.end(); it++) {
         what = it->first;
         w = it->second;
         //std::cout << "time:" << what << " loc: " << w << "\n";
     }
+    */
     
     auto K2_iter = control_points.upper_bound(time);
     assert(K2_iter != control_points.end());
