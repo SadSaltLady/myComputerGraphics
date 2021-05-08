@@ -3,3 +3,6 @@ AndrewID: yunyizha
 Animation:
 Task 1: Spline Interpolation: Fully implemented
 Task 2: Forward and Inverse Kinematics: fully implemented
+Task 3: Linear Blend Skinning: fully implemented
+Task 4: Physical Simulation: fully implemented
+Task 5: Make a movie: attached as movie.mp4
